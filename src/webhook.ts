@@ -3,9 +3,15 @@ import { Webhooks } from '@octokit/webhooks';
 import { handlePullRequest } from './github/pull-request';
 import { handleCheckRun } from './github/check-run';
 
+// Validate required environment variables
+const webhookSecret = process.env.GITHUB_WEBHOOK_SECRET;
+if (!webhookSecret) {
+  throw new Error('GITHUB_WEBHOOK_SECRET environment variable is required');
+}
+
 // Initialize webhooks
 const webhooks = new Webhooks({
-  secret: process.env.GITHUB_WEBHOOK_SECRET || '',
+  secret: webhookSecret,
 });
 
 // Pull Request events
@@ -58,11 +64,17 @@ export const webhookHandler = async (req: Request, res: Response): Promise<Respo
       return res.status(400).json({ error: 'Missing required webhook headers' });
     }
 
+    // Use rawBody for signature verification, req.body is already parsed JSON
+    const rawBody = (req as any).rawBody;
+    if (!rawBody) {
+      return res.status(400).json({ error: 'Missing raw body for verification' });
+    }
+
     await webhooks.verifyAndReceive({
       id,
-      name: event as any,
+      name: event as any, // GitHub sends various event names, type system can't enumerate all
       signature,
-      payload: req.body,
+      payload: rawBody,
     });
 
     return res.status(200).json({ message: 'Webhook received' });

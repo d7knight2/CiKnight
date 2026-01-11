@@ -1,53 +1,13 @@
-// GitHub Webhook Payload Types
-export interface PullRequestPayload {
-  action: string;
-  pull_request: {
-    number: number;
-    title: string;
-    state: string;
-    mergeable_state: string;
-    head: {
-      ref: string;
-      sha: string;
-    };
-    base: {
-      ref: string;
-      sha: string;
-    };
-  };
-  repository: {
-    name: string;
-    owner: {
-      login: string;
-    };
-  };
-  installation: {
-    id: number;
-  };
-}
+// Re-export commonly used types from official Octokit webhooks
+export type {
+  PullRequestOpenedEvent,
+  PullRequestSynchronizeEvent,
+  PullRequestReopenedEvent,
+  CheckRunCompletedEvent,
+  CheckSuiteCompletedEvent,
+} from '@octokit/webhooks-types';
 
-export interface CheckRunPayload {
-  action: string;
-  check_run: {
-    name: string;
-    status: string;
-    conclusion: string | null;
-    html_url: string;
-    pull_requests: Array<{
-      number: number;
-    }>;
-  };
-  repository: {
-    name: string;
-    owner: {
-      login: string;
-    };
-  };
-  installation: {
-    id: number;
-  };
-}
-
+// Custom helper types for the application
 export interface RepoInfo {
   owner: string;
   repo: string;
