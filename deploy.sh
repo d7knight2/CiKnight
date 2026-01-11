@@ -41,11 +41,13 @@ gcloud run deploy ${SERVICE_NAME} \
   --platform managed \
   --region ${REGION} \
   --allow-unauthenticated \
-  --set-env-vars "GITHUB_APP_ID=${GITHUB_APP_ID},GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET},NODE_ENV=production" \
+  --set-env-vars "GITHUB_APP_ID=${GITHUB_APP_ID},GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET},NODE_ENV=production,PORT=8080" \
   --set-secrets "GITHUB_PRIVATE_KEY=github-private-key:latest" \
   --memory 512Mi \
   --cpu 1 \
-  --max-instances 10
+  --max-instances 10 \
+  --timeout 60 \
+  --port 8080
 
 # Get the service URL
 SERVICE_URL=$(gcloud run services describe ${SERVICE_NAME} --platform managed --region ${REGION} --format 'value(status.url)')
