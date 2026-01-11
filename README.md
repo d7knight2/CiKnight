@@ -262,17 +262,18 @@ The CI pipeline runs automatically on push and pull request events:
 
 1. **Lint Job**: Checks code style with ESLint and Prettier
    - Must pass with zero errors or warnings
-   - Uses Node.js 18.20.8
+   - Uses Node.js 20
    - Includes npm dependency caching for faster builds
 
 2. **Test Job**: Runs unit tests and generates coverage reports
    - All tests must pass
    - Coverage reports are uploaded as artifacts
-   - Tests run against Node.js 18.20.8
+   - Tests run against Node.js 20
 
 3. **Build Job**: Compiles TypeScript and uploads build artifacts
    - TypeScript compilation must succeed
    - Build artifacts are uploaded for verification
+   - Uses Node.js 20
    - Uses the same Node.js version as production
 
 4. **Docker Job**: Builds Docker image for deployment

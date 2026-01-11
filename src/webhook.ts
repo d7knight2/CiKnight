@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { Webhooks } from '@octokit/webhooks';
 import { handlePullRequest } from './github/pull-request';
 import { handleCheckRun } from './github/check-run';
+import { PullRequestPayload, CheckRunPayload } from './types';
 
 // Extend Express Request type to include rawBody
 interface WebhookRequest extends Request {
@@ -22,23 +23,23 @@ const webhooks = new Webhooks({
 // Pull Request events
 webhooks.on('pull_request.opened', async ({ payload }) => {
   console.log(`📬 Pull request opened: #${payload.pull_request.number}`);
-  await handlePullRequest(payload as never, 'opened');
+  await handlePullRequest(payload as unknown as PullRequestPayload, 'opened');
 });
 
 webhooks.on('pull_request.synchronize', async ({ payload }) => {
   console.log(`🔄 Pull request synchronized: #${payload.pull_request.number}`);
-  await handlePullRequest(payload as never, 'synchronize');
+  await handlePullRequest(payload as unknown as PullRequestPayload, 'synchronize');
 });
 
 webhooks.on('pull_request.reopened', async ({ payload }) => {
   console.log(`🔓 Pull request reopened: #${payload.pull_request.number}`);
-  await handlePullRequest(payload as never, 'reopened');
+  await handlePullRequest(payload as unknown as PullRequestPayload, 'reopened');
 });
 
 // Check run events for CI failures
 webhooks.on('check_run.completed', async ({ payload }) => {
   console.log(`✅ Check run completed: ${payload.check_run.name}`);
-  await handleCheckRun(payload as never);
+  await handleCheckRun(payload as unknown as CheckRunPayload);
 });
 
 // Check suite events
@@ -77,7 +78,7 @@ export const webhookHandler = async (req: WebhookRequest, res: Response): Promis
 
     await webhooks.verifyAndReceive({
       id,
-      name: event as never, // GitHub sends various event names, type system can't enumerate all
+      name: event as Parameters<typeof webhooks.verifyAndReceive>[0]['name'], // Type cast for webhook event name
       signature,
       payload: rawBody,
     });
