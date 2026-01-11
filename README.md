@@ -77,6 +77,8 @@ npm start
 
 The server will start on `http://localhost:3000`.
 
+For detailed setup instructions, see [CIKNIGHT_QUICKSTART.md](CIKNIGHT_QUICKSTART.md).
+
 ## Development
 
 ### Project Structure
@@ -109,6 +111,11 @@ CiKnight/
 - `npm run lint:fix` - Fix linting issues automatically
 - `npm run format` - Format code with Prettier
 - `npm run format:check` - Check code formatting
+- `npm test` - Run unit tests
+- `npm run test:watch` - Run tests in watch mode
+- `npm run test:coverage` - Run tests with coverage report
+- `npm run test:e2e` - Run end-to-end tests with Playwright
+- `npm run test:all` - Run all tests (unit + e2e)
 
 ## Deployment
 
@@ -183,10 +190,41 @@ gcloud run deploy ciknight \
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed contribution guidelines.
+
+## Documentation
+
+- [Quick Start Guide](CIKNIGHT_QUICKSTART.md) - Detailed setup and troubleshooting
+- [Integration Guide](CIKNIGHT_INTEGRATION.md) - Best practices and advanced configuration
+- [Setup Guide](SETUP.md) - GitHub App creation and deployment
+- [Contributing Guide](CONTRIBUTING.md) - Development guidelines
+
+## Testing
+
+CiKnight includes comprehensive testing:
+
+- **Unit Tests**: Jest-based tests for core functionality
+  ```bash
+  npm test
+  ```
+
+- **E2E Tests**: Playwright tests for API endpoints and webhooks
+  ```bash
+  npm run test:e2e
+  ```
+
+- **Coverage Reports**: Generate test coverage
+  ```bash
+  npm run test:coverage
+  ```
+
 ## License
 
 MIT License - see LICENSE file for details
 
 ## Support
 
-For issues, questions, or contributions, please open an issue on GitHub.
+For issues, questions, or contributions, please:
+- Check the [documentation](CIKNIGHT_QUICKSTART.md)
+- Open an issue on [GitHub Issues](https://github.com/d7knight2/CiKnight/issues)
+- Review the [troubleshooting guide](CIKNIGHT_QUICKSTART.md#troubleshooting)
