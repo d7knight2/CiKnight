@@ -75,9 +75,37 @@ For production:
 npm start
 ```
 
-The server will start on `http://localhost:3000`.
+The server will start on `http://localhost:8080`.
 
 ## Development
+
+### Quick Start for Contributors
+
+Before making any changes, ensure your development environment is properly set up:
+
+```bash
+# 1. Install dependencies
+npm install
+
+# 2. Verify the build works
+npm run build
+
+# 3. Run linting to catch any issues
+npm run lint
+
+# 4. Run tests to ensure everything works
+npm test
+
+# 5. (Optional) Start development server
+npm run dev
+```
+
+**Pre-submission Checklist:**
+- [ ] Code builds successfully (`npm run build`)
+- [ ] All tests pass (`npm test`)
+- [ ] No linting errors (`npm run lint`)
+- [ ] Code is formatted (`npm run format`)
+- [ ] Docker builds successfully (if Dockerfile changes: `docker build -t ciknight:test .`)
 
 ### Project Structure
 
@@ -150,7 +178,7 @@ npm run test:e2e:ui
 
 ### Linting and Formatting
 
-The project uses ESLint for code linting and Prettier for code formatting:
+The project uses ESLint for code linting and Prettier for code formatting. All code must pass linting checks before being committed.
 
 ```bash
 # Check for linting issues
@@ -166,6 +194,54 @@ npm run format:check
 npm run format
 ```
 
+**Important Linting Rules:**
+- No `any` types are allowed - use proper TypeScript types
+- All functions must have explicit return types for public APIs
+- Unused variables are not permitted (except those prefixed with `_`)
+- Code must follow consistent formatting as defined in `.prettierrc.json`
+
+### Building the Project
+
+Before submitting changes, ensure your code builds successfully:
+
+```bash
+# Build TypeScript to JavaScript
+npm run build
+
+# The compiled output will be in the dist/ directory
+```
+
+The build process:
+1. Compiles TypeScript files from `src/` directory
+2. Outputs JavaScript files to `dist/` directory
+3. Uses `tsconfig.build.json` for build-specific TypeScript configuration
+4. Must complete without errors for CI to pass
+
+### Docker Build
+
+To build and test the Docker container locally:
+
+```bash
+# Build the Docker image
+docker build -t ciknight:local .
+
+# Run the container (requires environment variables)
+docker run -p 8080:8080 \
+  -e GITHUB_APP_ID=your_app_id \
+  -e GITHUB_PRIVATE_KEY="your_private_key" \
+  -e GITHUB_WEBHOOK_SECRET=your_webhook_secret \
+  ciknight:local
+
+# Test the health endpoint
+curl http://localhost:8080/health
+```
+
+**Docker Configuration:**
+- **Port**: Container exposes port 8080 (configurable via PORT environment variable)
+- **Multi-stage build**: Uses separate builder and production stages for optimization
+- **Health check**: Included for container orchestration systems
+- **Build dependencies**: All dependencies are installed during the build process
+
 ### Git Hooks
 
 The project uses Husky to run checks before commits and pushes:
@@ -175,16 +251,42 @@ The project uses Husky to run checks before commits and pushes:
 
 These hooks are automatically installed when you run `npm install`.
 
+**If Pre-push Fails:**
+1. Check the error messages - they'll indicate which step failed (test, build, or lint)
+2. Fix the issues locally before pushing again
+3. Run the failing command manually to debug: `npm test`, `npm run build`, or `npm run lint`
+
 ### Continuous Integration
 
 The CI pipeline runs automatically on push and pull request events:
 
 1. **Lint Job**: Checks code style with ESLint and Prettier
+   - Must pass with zero errors or warnings
+   - Uses Node.js 18.20.8
+   - Includes npm dependency caching for faster builds
+
 2. **Test Job**: Runs unit tests and generates coverage reports
+   - All tests must pass
+   - Coverage reports are uploaded as artifacts
+   - Tests run against Node.js 18.20.8
+
 3. **Build Job**: Compiles TypeScript and uploads build artifacts
+   - TypeScript compilation must succeed
+   - Build artifacts are uploaded for verification
+   - Uses the same Node.js version as production
+
 4. **Docker Job**: Builds Docker image for deployment
+   - Validates Dockerfile configuration
+   - Ensures all dependencies install correctly
+   - Uses Docker layer caching to speed up builds
 
 All jobs must pass before code can be merged.
+
+**Troubleshooting CI Failures:**
+- Check the GitHub Actions logs for detailed error messages
+- Reproduce the failure locally by running the same commands
+- Common issues: missing dependencies, type errors, test failures
+- The CI uses the exact same commands as local development
 
 ## Deployment
 

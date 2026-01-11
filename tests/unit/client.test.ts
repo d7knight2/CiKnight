@@ -5,11 +5,15 @@ describe('GitHub Client', () => {
     test('should extract repository information from payload', () => {
       const mockPayload = {
         repository: {
-          owner: { login: 'testuser' },
+          owner: { login: 'testuser', id: 1 },
           name: 'testrepo',
+          full_name: 'testuser/testrepo',
         },
         installation: {
           id: 12345,
+        },
+        sender: {
+          login: 'testuser',
         },
       };
 
@@ -25,11 +29,15 @@ describe('GitHub Client', () => {
     test('should handle different repository structures', () => {
       const mockPayload = {
         repository: {
-          owner: { login: 'orgname' },
+          owner: { login: 'orgname', id: 2 },
           name: 'project-repo',
+          full_name: 'orgname/project-repo',
         },
         installation: {
           id: 99999,
+        },
+        sender: {
+          login: 'contributor',
         },
       };
 

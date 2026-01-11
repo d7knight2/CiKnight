@@ -57,20 +57,35 @@ For feature requests, please create an issue describing:
    - Add comments for complex logic
    - Update documentation as needed
 
-5. **Test Your Changes**
+5. **Build and Test Your Changes**
    ```bash
-   # Build the project
+   # Build the project (must succeed)
    npm run build
    
-   # Run linter
+   # Run linter (must pass with 0 errors)
    npm run lint
+   
+   # Automatically fix linting issues
+   npm run lint:fix
    
    # Check formatting
    npm run format:check
    
+   # Format code
+   npm run format
+   
+   # Run all tests (must pass)
+   npm test
+   
    # Run the development server
    npm run dev
    ```
+   
+   **All checks must pass before submitting a PR:**
+   - Build completes without errors
+   - Linter returns 0 errors (warnings should be addressed)
+   - All tests pass
+   - Code is properly formatted
 
 6. **Commit Your Changes**
    ```bash
@@ -103,10 +118,13 @@ For feature requests, please create an issue describing:
 ### Code Style
 
 - Use TypeScript for all new code
+- **No `any` types allowed** - use proper TypeScript types
 - Follow the ESLint and Prettier configurations
 - Use meaningful variable and function names
 - Keep functions small and focused
 - Add JSDoc comments for public APIs
+- Add explicit return types for all public functions
+- Use proper error handling with type guards (avoid `error: any`)
 
 ### Project Structure
 
@@ -167,13 +185,14 @@ export async function handleIssueComment(payload: any) {
 
 ### Error Handling
 
-Always handle errors appropriately:
+Always handle errors appropriately with proper type guards:
 
 ```typescript
 try {
   // Your code
-} catch (error: any) {
-  console.error('❌ Error description:', error.message);
+} catch (error) {
+  const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+  console.error('❌ Error description:', errorMessage);
   // Don't throw - log and continue
 }
 ```
@@ -208,18 +227,21 @@ Use consistent logging:
 
 ### Docker Testing
 
-Test the Docker build:
+Test the Docker build (required for Dockerfile changes):
 
 ```bash
 # Build the image
 docker build -t ciknight:test .
 
-# Run locally
-docker run -p 3000:3000 \
+# Run locally (port 8080)
+docker run -p 8080:8080 \
   -e GITHUB_APP_ID=your_id \
   -e GITHUB_PRIVATE_KEY="your_key" \
   -e GITHUB_WEBHOOK_SECRET=your_secret \
   ciknight:test
+
+# Test the health endpoint
+curl http://localhost:8080/health
 ```
 
 ## Code Review Process
@@ -256,7 +278,7 @@ npm install -g smee-client
 
 # Create a channel at https://smee.io/
 # Then run:
-smee --url https://smee.io/YOUR_CHANNEL --path /webhook --port 3000
+smee --url https://smee.io/YOUR_CHANNEL --path /webhook --port 8080
 ```
 
 ### Debugging
