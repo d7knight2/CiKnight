@@ -33,9 +33,12 @@ ENV PORT=8080
 # Expose port (Cloud Run uses 8080 by default)
 EXPOSE 8080
 
-# Health check - uses PORT environment variable
+# Health check - uses PORT environment variable for Cloud Run compatibility
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-  CMD node -e "const port = process.env.PORT || 8080; require('http').get(\`http://localhost:\${port}/health\`, (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
+  CMD node -e "const port = process.env.PORT || 8080; \
+    require('http').get('http://localhost:' + port + '/health', (r) => { \
+      process.exit(r.statusCode === 200 ? 0 : 1); \
+    })"
 
 # Run the application
 CMD ["node", "dist/index.js"]

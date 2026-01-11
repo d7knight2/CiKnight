@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Docker Test Script for CiKnight
 # Tests that the application correctly binds to the specified PORT in a containerized environment
@@ -48,7 +48,7 @@ docker run -d \
   -e PORT=${TEST_PORT} \
   -e NODE_ENV=production \
   -e GITHUB_APP_ID=test_app_id \
-  -e GITHUB_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\ntest\n-----END RSA PRIVATE KEY-----" \
+  -e GITHUB_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\nTEST_KEY_FOR_DOCKER_VALIDATION_ONLY\n-----END RSA PRIVATE KEY-----" \
   -e GITHUB_WEBHOOK_SECRET=test_secret \
   ${IMAGE_NAME}
 
@@ -128,7 +128,12 @@ docker ps -a --filter "name=${CONTAINER_NAME}" --format "table {{.Names}}\t{{.St
 
 echo ""
 echo "📊 Application response:"
-curl -s http://localhost:${TEST_PORT}/ | jq . 2>/dev/null || curl -s http://localhost:${TEST_PORT}/
+APP_RESPONSE=$(curl -s http://localhost:${TEST_PORT}/)
+if command -v jq &> /dev/null; then
+  echo "$APP_RESPONSE" | jq .
+else
+  echo "$APP_RESPONSE"
+fi
 
 echo ""
 echo "💡 To test with a different port, run:"
