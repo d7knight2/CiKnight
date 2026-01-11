@@ -1,0 +1,23 @@
+{
+  "name": "CiKnight",
+  "url": "https://github.com/d7knight2/CiKnight",
+  "hook_attributes": {
+    "url": "https://your-cloud-run-url.run.app/webhook"
+  },
+  "redirect_url": "https://github.com/d7knight2/CiKnight",
+  "public": false,
+  "default_permissions": {
+    "checks": "write",
+    "contents": "write",
+    "issues": "write",
+    "pull_requests": "write",
+    "statuses": "read"
+  },
+  "default_events": [
+    "pull_request",
+    "check_run",
+    "check_suite",
+    "status"
+  ],
+  "description": "A GitHub App that automatically resolves merge conflicts, fixes CI failures, applies patches, and keeps PRs mergeable."
+}

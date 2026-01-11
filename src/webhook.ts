@@ -1,0 +1,75 @@
+import { Request, Response } from 'express';
+import { Webhooks, createNodeMiddleware } from '@octokit/webhooks';
+import { handlePullRequest } from './github/pull-request';
+import { handleCheckRun } from './github/check-run';
+
+// Initialize webhooks
+const webhooks = new Webhooks({
+  secret: process.env.GITHUB_WEBHOOK_SECRET || '',
+});
+
+// Pull Request events
+webhooks.on('pull_request.opened', async ({ payload }) => {
+  console.log(`📬 Pull request opened: #${payload.pull_request.number}`);
+  await handlePullRequest(payload, 'opened');
+});
+
+webhooks.on('pull_request.synchronize', async ({ payload }) => {
+  console.log(`🔄 Pull request synchronized: #${payload.pull_request.number}`);
+  await handlePullRequest(payload, 'synchronize');
+});
+
+webhooks.on('pull_request.reopened', async ({ payload }) => {
+  console.log(`🔓 Pull request reopened: #${payload.pull_request.number}`);
+  await handlePullRequest(payload, 'reopened');
+});
+
+// Check run events for CI failures
+webhooks.on('check_run.completed', async ({ payload }) => {
+  console.log(`✅ Check run completed: ${payload.check_run.name}`);
+  await handleCheckRun(payload);
+});
+
+// Check suite events
+webhooks.on('check_suite.completed', async ({ payload }) => {
+  console.log(`📦 Check suite completed: ${payload.check_suite.head_branch}`);
+  // Handle check suite completion if needed
+});
+
+// Status events
+webhooks.on('status', async ({ payload }) => {
+  console.log(`📊 Status event: ${payload.context} - ${payload.state}`);
+  // Handle status events if needed
+});
+
+// Error handling
+webhooks.onError((error) => {
+  console.error('❌ Webhook error:', error);
+});
+
+// Webhook handler for Express
+export const webhookHandler = async (req: Request, res: Response) => {
+  try {
+    const signature = req.headers['x-hub-signature-256'] as string;
+    const event = req.headers['x-github-event'] as string;
+    const id = req.headers['x-github-delivery'] as string;
+
+    if (!signature || !event || !id) {
+      return res.status(400).json({ error: 'Missing required webhook headers' });
+    }
+
+    await webhooks.verifyAndReceive({
+      id,
+      name: event as any,
+      signature,
+      payload: req.body,
+    });
+
+    res.status(200).json({ message: 'Webhook received' });
+  } catch (error: any) {
+    console.error('❌ Error processing webhook:', error);
+    res.status(500).json({ error: 'Internal server error', message: error.message });
+  }
+};
+
+export { webhooks };
