@@ -23,8 +23,8 @@ describe('Helper Functions', () => {
       const start = Date.now();
       await sleep(100);
       const duration = Date.now() - start;
-      expect(duration).toBeGreaterThanOrEqual(95); // Allow small margin
-      expect(duration).toBeLessThan(200);
+      expect(duration).toBeGreaterThanOrEqual(95); // Allow small margin for system scheduling
+      expect(duration).toBeLessThan(150); // Tighter upper bound to catch timing issues
     });
 
     test('should return a Promise', () => {

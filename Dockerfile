@@ -4,7 +4,7 @@ FROM node:18-alpine AS builder
 WORKDIR /app
 
 # Copy all files needed for build
-COPY package*.json tsconfig.json ./
+COPY package*.json tsconfig*.json ./
 COPY src ./src
 
 # Install dependencies and build

@@ -1,13 +1,14 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const WEB_SERVER_TIMEOUT_MS = 120000; // 2 minutes
+// 2 minutes timeout for web server startup; intentionally high to accommodate slow CI cold starts
+const WEB_SERVER_TIMEOUT_MS = 120000;
 
 export default defineConfig({
   testDir: './tests/integration',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  workers: 1, // Single worker sufficient for small test suite
   reporter: 'html',
   use: {
     baseURL: 'http://localhost:3000',

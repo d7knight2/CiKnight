@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { version } from '../../package.json';
 
 test.describe('CiKnight API', () => {
   test('should respond with service information on root endpoint', async ({ request }) => {
@@ -10,7 +11,7 @@ test.describe('CiKnight API', () => {
     const data = await response.json();
 
     expect(data).toHaveProperty('name', 'CiKnight');
-    expect(data).toHaveProperty('version', '1.0.0');
+    expect(data).toHaveProperty('version', version);
     expect(data).toHaveProperty('status', 'running');
     expect(data).toHaveProperty('description');
   });
