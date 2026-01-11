@@ -49,6 +49,8 @@ app.post('/webhook', webhookLimiter, webhookHandler);
 app.listen(PORT, () => {
   console.log(`🚀 CiKnight is running on port ${PORT}`);
   console.log(`📡 Webhook endpoint: http://localhost:${PORT}/webhook`);
+  console.log(`💚 Health check endpoint: http://localhost:${PORT}/health`);
+  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
 });
 
 // Graceful shutdown

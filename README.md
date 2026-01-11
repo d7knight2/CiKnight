@@ -188,6 +188,51 @@ All jobs must pass before code can be merged.
 
 ## Deployment
 
+### Testing Docker Locally
+
+Before deploying to Cloud Run, you can test the Docker container locally to ensure it works correctly:
+
+#### Quick Test
+
+```bash
+# Test with default port (8080)
+./scripts/test-docker.sh
+
+# Test with custom port
+TEST_PORT=3000 ./scripts/test-docker.sh
+```
+
+The test script will:
+- Build the Docker image
+- Start a container with the specified port
+- Verify the application starts and responds correctly
+- Check that the application binds to the expected port
+- Run health checks
+
+#### Manual Docker Testing
+
+You can also manually test the Docker container:
+
+```bash
+# Build the image
+docker build -t ciknight .
+
+# Run the container on port 8080 (Cloud Run default)
+docker run -p 8080:8080 \
+  -e PORT=8080 \
+  -e NODE_ENV=production \
+  -e GITHUB_APP_ID=your_app_id \
+  -e GITHUB_PRIVATE_KEY="your_private_key" \
+  -e GITHUB_WEBHOOK_SECRET=your_webhook_secret \
+  ciknight
+
+# Test the endpoints
+curl http://localhost:8080/health
+curl http://localhost:8080/
+```
+
+**Note:** The application dynamically binds to the PORT environment variable. Cloud Run automatically sets PORT=8080, but you can test with any port locally.
+
 ### Google Cloud Run
 
 1. **Build the Docker image:**
@@ -210,8 +255,23 @@ gcloud run deploy ciknight \
   --platform managed \
   --region us-central1 \
   --allow-unauthenticated \
-  --set-env-vars "GITHUB_APP_ID=your_app_id,GITHUB_WEBHOOK_SECRET=your_secret" \
+  --port 8080 \
+  --timeout 60 \
+  --set-env-vars "GITHUB_APP_ID=your_app_id,GITHUB_WEBHOOK_SECRET=your_secret,PORT=8080" \
   --set-secrets "GITHUB_PRIVATE_KEY=github-private-key:latest"
+```
+
+**Important Cloud Run Configuration:**
+- `--port 8080`: Specifies the port the container listens on
+- `--timeout 60`: Extended timeout for startup (default is 300s, but explicitly set for clarity)
+- `PORT=8080`: Environment variable that the app uses to bind to the correct port
+
+Alternatively, use the provided deployment script:
+
+```bash
+export GITHUB_APP_ID=your_app_id
+export GITHUB_WEBHOOK_SECRET=your_webhook_secret
+./deploy.sh
 ```
 
 4. **Configure GitHub App webhook URL:**
