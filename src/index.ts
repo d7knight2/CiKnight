@@ -11,14 +11,14 @@ const PORT = process.env.PORT || 3000;
 // Middleware for parsing JSON and raw body for webhook verification
 app.use(
   express.json({
-    verify: (req: any, res, buf) => {
+    verify: (req: any, _res, buf) => {
       req.rawBody = buf.toString();
     },
   })
 );
 
 // Health check endpoint
-app.get('/', (req, res) => {
+app.get('/', (_req, res) => {
   res.json({
     name: 'CiKnight',
     version: '1.0.0',
@@ -28,7 +28,7 @@ app.get('/', (req, res) => {
 });
 
 // Health check endpoint for Cloud Run
-app.get('/health', (req, res) => {
+app.get('/health', (_req, res) => {
   res.status(200).json({ status: 'healthy' });
 });
 

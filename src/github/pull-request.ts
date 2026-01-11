@@ -39,12 +39,7 @@ export async function handlePullRequest(payload: any, action: string) {
   }
 }
 
-async function handleMergeConflicts(
-  octokit: any,
-  owner: string,
-  repo: string,
-  prNumber: number
-) {
+async function handleMergeConflicts(octokit: any, owner: string, repo: string, prNumber: number) {
   try {
     // Comment on the PR about merge conflicts
     await octokit.issues.createComment({

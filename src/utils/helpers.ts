@@ -1,4 +1,4 @@
-# Utilities for common operations
+// Utilities for common operations
 export function isValidUrl(url: string): boolean {
   try {
     new URL(url);

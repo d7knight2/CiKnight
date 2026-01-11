@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { Webhooks, createNodeMiddleware } from '@octokit/webhooks';
+import { Webhooks } from '@octokit/webhooks';
 import { handlePullRequest } from './github/pull-request';
 import { handleCheckRun } from './github/check-run';
 
@@ -48,7 +48,7 @@ webhooks.onError((error) => {
 });
 
 // Webhook handler for Express
-export const webhookHandler = async (req: Request, res: Response) => {
+export const webhookHandler = async (req: Request, res: Response): Promise<Response> => {
   try {
     const signature = req.headers['x-hub-signature-256'] as string;
     const event = req.headers['x-github-event'] as string;
@@ -65,10 +65,10 @@ export const webhookHandler = async (req: Request, res: Response) => {
       payload: req.body,
     });
 
-    res.status(200).json({ message: 'Webhook received' });
+    return res.status(200).json({ message: 'Webhook received' });
   } catch (error: any) {
     console.error('❌ Error processing webhook:', error);
-    res.status(500).json({ error: 'Internal server error', message: error.message });
+    return res.status(500).json({ error: 'Internal server error', message: error.message });
   }
 };
 
