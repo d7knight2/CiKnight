@@ -18,8 +18,8 @@ WORKDIR /app
 # Copy package files
 COPY package*.json package-lock.json ./
 
-# Install production dependencies only
-RUN npm ci --only=production
+# Install production dependencies only (skip prepare scripts like husky)
+RUN npm ci --only=production --ignore-scripts
 
 # Copy built application from builder
 COPY --from=builder /app/dist ./dist
