@@ -1,0 +1,22 @@
+# .dockerignore
+node_modules
+npm-debug.log
+.env
+.env.*
+.git
+.gitignore
+README.md
+.vscode
+.idea
+dist
+coverage
+.nyc_output
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+tmp/
+temp/
+*.tmp
+deploy.sh
