@@ -94,7 +94,11 @@ CiKnight/
 │   │   └── index.ts
 │   └── utils/                # Utility functions
 │       └── helpers.ts
+├── tests/                    # Test files
+│   ├── unit/                 # Unit tests
+│   └── integration/          # Integration tests
 ├── .env.example              # Environment variables template
+├── .husky/                   # Git hooks
 ├── Dockerfile                # Container configuration
 ├── package.json              # Dependencies and scripts
 └── tsconfig.json             # TypeScript configuration
@@ -109,6 +113,78 @@ CiKnight/
 - `npm run lint:fix` - Fix linting issues automatically
 - `npm run format` - Format code with Prettier
 - `npm run format:check` - Check code formatting
+- `npm test` - Run unit tests with Jest
+- `npm run test:watch` - Run tests in watch mode
+- `npm run test:coverage` - Generate test coverage report
+- `npm run test:e2e` - Run Playwright integration tests
+- `npm run test:e2e:ui` - Run Playwright tests with UI
+
+### Running Tests
+
+#### Unit Tests
+
+Unit tests are written using Jest and located in the `tests/unit` directory:
+
+```bash
+# Run all unit tests
+npm test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Generate coverage report
+npm run test:coverage
+```
+
+#### Integration Tests
+
+Integration tests use Playwright and are located in `tests/integration`:
+
+```bash
+# Run integration tests
+npm run test:e2e
+
+# Run with UI mode for debugging
+npm run test:e2e:ui
+```
+
+### Linting and Formatting
+
+The project uses ESLint for code linting and Prettier for code formatting:
+
+```bash
+# Check for linting issues
+npm run lint
+
+# Automatically fix linting issues
+npm run lint:fix
+
+# Check code formatting
+npm run format:check
+
+# Format all code
+npm run format
+```
+
+### Git Hooks
+
+The project uses Husky to run checks before commits and pushes:
+
+- **Pre-commit**: Runs `lint-staged` to lint and format staged files
+- **Pre-push**: Runs tests and build to ensure code quality
+
+These hooks are automatically installed when you run `npm install`.
+
+### Continuous Integration
+
+The CI pipeline runs automatically on push and pull request events:
+
+1. **Lint Job**: Checks code style with ESLint and Prettier
+2. **Test Job**: Runs unit tests and generates coverage reports
+3. **Build Job**: Compiles TypeScript and uploads build artifacts
+4. **Docker Job**: Builds Docker image for deployment
+
+All jobs must pass before code can be merged.
 
 ## Deployment
 
