@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const WEB_SERVER_TIMEOUT_MS = 120000; // 2 minutes
+
 export default defineConfig({
   testDir: './tests/integration',
   fullyParallel: true,
@@ -23,6 +25,6 @@ export default defineConfig({
     command: 'npm run dev',
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
-    timeout: 120 * 1000,
+    timeout: WEB_SERVER_TIMEOUT_MS,
   },
 });

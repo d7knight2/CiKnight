@@ -10,7 +10,6 @@ build/
 *.d.ts
 *.d.ts.map
 !jest.config.js
-!playwright.config.ts
 
 # Environment variables
 .env
