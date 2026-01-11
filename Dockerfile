@@ -1,25 +1,31 @@
 # Build stage
-FROM node:18-alpine AS builder
-
-WORKDIR /app
-
-# Copy all files needed for build
-COPY package*.json tsconfig*.json ./
-COPY src ./src
-
-# Install dependencies and build
-RUN npm ci && npm run build
-
-# Production stage
-FROM node:18-alpine
+FROM node:20-slim AS builder
 
 WORKDIR /app
 
 # Copy package files
-COPY package*.json package-lock.json ./
+COPY package.json ./
+
+# Install dependencies without package-lock to avoid npm ci bug
+RUN npm install
+
+# Copy source and config files
+COPY tsconfig*.json ./
+COPY src ./src
+
+# Build the application
+RUN npm run build
+
+# Production stage
+FROM node:20-slim
+
+WORKDIR /app
+
+# Copy package files
+COPY package.json ./
 
 # Install production dependencies only (skip prepare scripts like husky)
-RUN npm ci --only=production --ignore-scripts
+RUN npm install --omit=dev --ignore-scripts
 
 # Copy built application from builder
 COPY --from=builder /app/dist ./dist

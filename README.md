@@ -12,7 +12,7 @@ A GitHub App that automatically resolves merge conflicts, fixes CI failures, app
 
 ## Prerequisites
 
-- Node.js 18 or higher
+- Node.js 20 or higher
 - A GitHub App with the following permissions:
   - **Pull requests**: Read & Write
   - **Checks**: Read & Write
