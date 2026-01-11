@@ -1,6 +1,10 @@
 import { createGitHubClient, getRepoInfo } from './client';
+import { PullRequestPayload, OctokitInstance } from '../types';
 
-export async function handlePullRequest(payload: any, action: string) {
+export async function handlePullRequest(
+  payload: PullRequestPayload,
+  action: string
+): Promise<void> {
   try {
     const { owner, repo, installationId } = getRepoInfo(payload);
     const octokit = createGitHubClient(installationId);
@@ -34,12 +38,18 @@ export async function handlePullRequest(payload: any, action: string) {
         body: `🛡️ **CiKnight is now monitoring this PR**\n\nI'll help with:\n- 🔀 Resolving merge conflicts\n- 🔧 Fixing CI failures\n- 📝 Applying patches\n\nStay tuned!`,
       });
     }
-  } catch (error: any) {
-    console.error(`❌ Error handling pull request:`, error.message);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error(`❌ Error handling pull request:`, errorMessage);
   }
 }
 
-async function handleMergeConflicts(octokit: any, owner: string, repo: string, prNumber: number) {
+async function handleMergeConflicts(
+  octokit: OctokitInstance,
+  owner: string,
+  repo: string,
+  prNumber: number
+): Promise<void> {
   try {
     // Comment on the PR about merge conflicts
     await octokit.issues.createComment({
@@ -57,7 +67,8 @@ async function handleMergeConflicts(octokit: any, owner: string, repo: string, p
     // 2. Attempting to merge with conflict markers
     // 3. Using AI/heuristics to resolve conflicts
     // 4. Creating a new commit with resolved conflicts
-  } catch (error: any) {
-    console.error(`❌ Error handling merge conflicts:`, error.message);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error(`❌ Error handling merge conflicts:`, errorMessage);
   }
 }

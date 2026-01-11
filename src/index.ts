@@ -1,18 +1,23 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import { webhookHandler } from './webhook';
+
+// Extend Express Request type to include rawBody
+interface WebhookRequest extends Request {
+  rawBody?: string;
+}
 
 // Load environment variables
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 
 // Middleware for parsing JSON and raw body for webhook verification
 app.use(
   express.json({
-    verify: (req: any, _res, buf) => {
+    verify: (req: WebhookRequest, _res: Response, buf: Buffer) => {
       req.rawBody = buf.toString();
     },
   })

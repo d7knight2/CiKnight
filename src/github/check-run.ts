@@ -1,6 +1,7 @@
 import { createGitHubClient, getRepoInfo } from './client';
+import { CheckRunPayload, OctokitInstance } from '../types';
 
-export async function handleCheckRun(payload: any) {
+export async function handleCheckRun(payload: CheckRunPayload): Promise<void> {
   try {
     const { owner, repo, installationId } = getRepoInfo(payload);
     const octokit = createGitHubClient(installationId);
@@ -27,18 +28,19 @@ export async function handleCheckRun(payload: any) {
     for (const pr of pullRequests) {
       await handleCIFailure(octokit, owner, repo, pr.number, checkRun);
     }
-  } catch (error: any) {
-    console.error(`❌ Error handling check run:`, error.message);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error(`❌ Error handling check run:`, errorMessage);
   }
 }
 
 async function handleCIFailure(
-  octokit: any,
+  octokit: OctokitInstance,
   owner: string,
   repo: string,
   prNumber: number,
-  checkRun: any
-) {
+  checkRun: CheckRunPayload['check_run']
+): Promise<void> {
   try {
     console.log(`🔧 Handling CI failure for PR #${prNumber}`);
 
@@ -59,7 +61,8 @@ async function handleCIFailure(
     // 3. Generating fixes based on the failure type
     // 4. Creating a commit with the fixes
     // 5. Pushing to the PR branch
-  } catch (error: any) {
-    console.error(`❌ Error handling CI failure:`, error.message);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error(`❌ Error handling CI failure:`, errorMessage);
   }
 }

@@ -27,12 +27,12 @@ COPY --from=builder /app/dist ./dist
 # Set environment to production
 ENV NODE_ENV=production
 
-# Expose port (Cloud Run will set PORT env variable)
-EXPOSE 3000
+# Expose port 8080 (default for Cloud Run and most cloud platforms)
+EXPOSE 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
+  CMD node -e "require('http').get('http://localhost:${PORT:-8080}/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
 # Run the application
 CMD ["node", "dist/index.js"]

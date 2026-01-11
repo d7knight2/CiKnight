@@ -1,5 +1,6 @@
 import { Octokit } from '@octokit/rest';
 import { createAppAuth } from '@octokit/auth-app';
+import { RepoInfo, WebhookPayloadBase } from '../types';
 
 // Create an authenticated GitHub App client
 export function createGitHubClient(installationId: number): Octokit {
@@ -21,7 +22,7 @@ export function createGitHubClient(installationId: number): Octokit {
 }
 
 // Get repository information from payload
-export function getRepoInfo(payload: any) {
+export function getRepoInfo(payload: WebhookPayloadBase): RepoInfo {
   return {
     owner: payload.repository.owner.login,
     repo: payload.repository.name,
