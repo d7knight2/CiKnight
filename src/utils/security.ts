@@ -84,11 +84,14 @@ export async function fetchGitHubIpRanges(): Promise<string[]> {
  */
 function normalizeIpv6MappedIpv4(ip: string): string {
   // Check if it's an IPv6-mapped IPv4 address (::ffff:X.X.X.X format)
-  const ipv6MappedIpv4Regex = /^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/i;
+  // Regex matches ::ffff: followed by 4 octets (0-255 each)
+  const ipv6MappedIpv4Regex =
+    /^::ffff:(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/i;
   const match = ip.match(ipv6MappedIpv4Regex);
 
   if (match) {
-    return match[1]; // Return the IPv4 part
+    // Return the IPv4 part (octets 1-4 from regex capture groups)
+    return `${match[1]}.${match[2]}.${match[3]}.${match[4]}`;
   }
 
   return ip; // Return original IP if not IPv6-mapped IPv4

@@ -235,6 +235,12 @@ describe('Security Functions', () => {
       expect(result).toBe(true);
     });
 
+    it('should not normalize invalid IPv6-mapped IPv4 addresses with out-of-range octets', async () => {
+      // ::ffff:999.999.999.999 should not be normalized (invalid IPv4 octets)
+      const result = await isValidGitHubIp('::ffff:999.999.999.999');
+      expect(result).toBe(false);
+    });
+
     it('should fail closed by default on error when no cache', async () => {
       // Ensure there is no cached IP data before simulating a network error
       clearIpCache();
