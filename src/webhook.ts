@@ -16,36 +16,60 @@ const webhooks = new Webhooks({
 
 // Pull Request events
 webhooks.on('pull_request.opened', async ({ payload }) => {
-  console.log(`📬 Pull request opened: #${payload.pull_request.number}`);
-  await handlePullRequest(payload, 'opened');
+  try {
+    console.log(`📬 Pull request opened: #${payload.pull_request.number}`);
+    await handlePullRequest(payload, 'opened');
+  } catch (error: any) {
+    console.error(`❌ Error handling pull_request.opened event:`, error.message, error);
+  }
 });
 
 webhooks.on('pull_request.synchronize', async ({ payload }) => {
-  console.log(`🔄 Pull request synchronized: #${payload.pull_request.number}`);
-  await handlePullRequest(payload, 'synchronize');
+  try {
+    console.log(`🔄 Pull request synchronized: #${payload.pull_request.number}`);
+    await handlePullRequest(payload, 'synchronize');
+  } catch (error: any) {
+    console.error(`❌ Error handling pull_request.synchronize event:`, error.message, error);
+  }
 });
 
 webhooks.on('pull_request.reopened', async ({ payload }) => {
-  console.log(`🔓 Pull request reopened: #${payload.pull_request.number}`);
-  await handlePullRequest(payload, 'reopened');
+  try {
+    console.log(`🔓 Pull request reopened: #${payload.pull_request.number}`);
+    await handlePullRequest(payload, 'reopened');
+  } catch (error: any) {
+    console.error(`❌ Error handling pull_request.reopened event:`, error.message, error);
+  }
 });
 
 // Check run events for CI failures
 webhooks.on('check_run.completed', async ({ payload }) => {
-  console.log(`✅ Check run completed: ${payload.check_run.name}`);
-  await handleCheckRun(payload);
+  try {
+    console.log(`✅ Check run completed: ${payload.check_run.name}`);
+    await handleCheckRun(payload);
+  } catch (error: any) {
+    console.error(`❌ Error handling check_run.completed event:`, error.message, error);
+  }
 });
 
 // Check suite events
 webhooks.on('check_suite.completed', async ({ payload }) => {
-  console.log(`📦 Check suite completed: ${payload.check_suite.head_branch}`);
-  // Handle check suite completion if needed
+  try {
+    console.log(`📦 Check suite completed: ${payload.check_suite.head_branch}`);
+    // Handle check suite completion if needed
+  } catch (error: any) {
+    console.error(`❌ Error handling check_suite.completed event:`, error.message, error);
+  }
 });
 
 // Status events
 webhooks.on('status', async ({ payload }) => {
-  console.log(`📊 Status event: ${payload.context} - ${payload.state}`);
-  // Handle status events if needed
+  try {
+    console.log(`📊 Status event: ${payload.context} - ${payload.state}`);
+    // Handle status events if needed
+  } catch (error: any) {
+    console.error(`❌ Error handling status event:`, error.message, error);
+  }
 });
 
 // Error handling
@@ -99,6 +123,7 @@ export const webhookHandler = async (req: Request, res: Response): Promise<Respo
       payload: rawBody,
     });
 
+    console.log(`✅ Webhook verified and processed successfully: ${event} (${id})`);
     return res.status(200).json({ message: 'Webhook received' });
   } catch (error: any) {
     console.error('❌ Error processing webhook:', error);
