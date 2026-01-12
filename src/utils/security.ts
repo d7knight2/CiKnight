@@ -79,6 +79,32 @@ export async function fetchGitHubIpRanges(): Promise<string[]> {
 }
 
 /**
+ * Regex pattern for matching IPv6-mapped IPv4 addresses (::ffff:X.X.X.X)
+ * Each octet is validated to be in the range 0-255
+ */
+const IPV6_MAPPED_IPV4_REGEX = (() => {
+  // Pattern to match a single IPv4 octet (0-255)
+  const octet = '(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)';
+  return new RegExp(`^::ffff:${octet}\\.${octet}\\.${octet}\\.${octet}$`, 'i');
+})();
+
+/**
+ * Normalizes IPv6-mapped IPv4 addresses to their IPv4 equivalents
+ * Converts addresses like ::ffff:192.0.2.1 to 192.0.2.1
+ */
+function normalizeIpv6MappedIpv4(ip: string): string {
+  // Check if it's an IPv6-mapped IPv4 address (::ffff:X.X.X.X format)
+  const match = ip.match(IPV6_MAPPED_IPV4_REGEX);
+
+  if (match) {
+    // Return the IPv4 part (octets 1-4 from regex capture groups)
+    return `${match[1]}.${match[2]}.${match[3]}.${match[4]}`;
+  }
+
+  return ip; // Return original IP if not IPv6-mapped IPv4
+}
+
+/**
  * Checks if an IP address is within a CIDR range
  */
 function isIpInCidr(ip: string, cidr: string): boolean {
@@ -98,8 +124,8 @@ function isIpInCidr(ip: string, cidr: string): boolean {
 
   // Handle IPv6 (basic implementation)
   // Note: This handles standard IPv6 CIDR matching for GitHub's webhook IP ranges.
-  // Limitations: Does not support IPv4-mapped IPv6 addresses (e.g., ::ffff:192.0.2.1).
-  // Validates standard IPv6 formats used by GitHub's Meta API.
+  // IPv4-mapped IPv6 addresses (e.g., ::ffff:192.0.2.1) are normalized to IPv4
+  // by the normalizeIpv6MappedIpv4 function before reaching this point.
   if (ip.includes(':') && cidr.includes(':')) {
     // For simplicity, we'll do a basic prefix match
     const [range, bits] = cidr.split('/');
@@ -167,11 +193,14 @@ export async function isValidGitHubIp(ip: string): Promise<boolean> {
   if (!ip) return false;
 
   try {
+    // Normalize IPv6-mapped IPv4 addresses to their IPv4 equivalents
+    const normalizedIp = normalizeIpv6MappedIpv4(ip);
+
     const ipRanges = await fetchGitHubIpRanges();
 
     // Check if IP is in any of the allowed ranges
     for (const cidr of ipRanges) {
-      if (isIpInCidr(ip, cidr)) {
+      if (isIpInCidr(normalizedIp, cidr)) {
         return true;
       }
     }
@@ -197,6 +226,8 @@ export async function isValidGitHubIp(ip: string): Promise<boolean> {
 export function getClientIp(req: Request): string {
   const trustProxy = process.env.TRUST_PROXY === 'true';
 
+  let clientIp = '';
+
   // Only trust forwarding headers if explicitly configured
   if (trustProxy) {
     // Check for X-Forwarded-For header (common in proxied environments)
@@ -204,18 +235,25 @@ export function getClientIp(req: Request): string {
     if (forwardedFor) {
       // X-Forwarded-For can contain multiple IPs, take the first one
       const ips = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor;
-      return ips.split(',')[0].trim();
+      clientIp = ips.split(',')[0].trim();
     }
 
     // Check for X-Real-IP header
-    const realIp = req.headers['x-real-ip'];
-    if (realIp) {
-      return Array.isArray(realIp) ? realIp[0] : realIp;
+    if (!clientIp) {
+      const realIp = req.headers['x-real-ip'];
+      if (realIp) {
+        clientIp = Array.isArray(realIp) ? realIp[0] : realIp;
+      }
     }
   }
 
   // Fall back to socket address (always trusted)
-  return req.socket.remoteAddress || '';
+  if (!clientIp) {
+    clientIp = req.socket.remoteAddress || '';
+  }
+
+  // Normalize IPv6-mapped IPv4 addresses to their IPv4 equivalents
+  return normalizeIpv6MappedIpv4(clientIp);
 }
 
 // Note: Webhook signature verification is handled by @octokit/webhooks.verifyAndReceive

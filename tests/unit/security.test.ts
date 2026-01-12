@@ -211,6 +211,36 @@ describe('Security Functions', () => {
       expect(result).toBe(false);
     });
 
+    it('should normalize and validate IPv6-mapped IPv4 addresses', async () => {
+      // ::ffff:192.30.252.1 should be normalized to 192.30.252.1 and validated against IPv4 ranges
+      const result = await isValidGitHubIp('::ffff:192.30.252.1');
+      expect(result).toBe(true);
+    });
+
+    it('should normalize and reject IPv6-mapped IPv4 addresses not in range', async () => {
+      // ::ffff:10.0.0.1 should be normalized to 10.0.0.1 and rejected
+      const result = await isValidGitHubIp('::ffff:10.0.0.1');
+      expect(result).toBe(false);
+    });
+
+    it('should handle IPv6-mapped IPv4 addresses in different GitHub ranges', async () => {
+      // ::ffff:185.199.108.50 should be normalized to 185.199.108.50 and validated
+      const result = await isValidGitHubIp('::ffff:185.199.108.50');
+      expect(result).toBe(true);
+    });
+
+    it('should handle uppercase IPv6-mapped IPv4 addresses', async () => {
+      // ::FFFF:192.30.252.1 (uppercase) should be normalized and validated
+      const result = await isValidGitHubIp('::FFFF:192.30.252.1');
+      expect(result).toBe(true);
+    });
+
+    it('should not normalize invalid IPv6-mapped IPv4 addresses with out-of-range octets', async () => {
+      // ::ffff:999.999.999.999 should not be normalized (invalid IPv4 octets)
+      const result = await isValidGitHubIp('::ffff:999.999.999.999');
+      expect(result).toBe(false);
+    });
+
     it('should fail closed by default on error when no cache', async () => {
       // Ensure there is no cached IP data before simulating a network error
       clearIpCache();
@@ -306,6 +336,62 @@ describe('Security Functions', () => {
 
       const ip = getClientIp(req);
       expect(ip).toBe('203.0.113.1');
+    });
+
+    it('should normalize IPv6-mapped IPv4 addresses from socket', () => {
+      const req = {
+        headers: {},
+        socket: { remoteAddress: '::ffff:192.30.252.1' },
+      } as unknown as Request;
+
+      const ip = getClientIp(req);
+      expect(ip).toBe('192.30.252.1');
+    });
+
+    it('should normalize IPv6-mapped IPv4 addresses from X-Forwarded-For header', () => {
+      process.env.TRUST_PROXY = 'true';
+      const req = {
+        headers: {
+          'x-forwarded-for': '::ffff:203.0.113.1',
+        },
+        socket: { remoteAddress: '10.0.0.1' },
+      } as unknown as Request;
+
+      const ip = getClientIp(req);
+      expect(ip).toBe('203.0.113.1');
+    });
+
+    it('should normalize IPv6-mapped IPv4 addresses from X-Real-IP header', () => {
+      process.env.TRUST_PROXY = 'true';
+      const req = {
+        headers: {
+          'x-real-ip': '::ffff:203.0.113.1',
+        },
+        socket: { remoteAddress: '10.0.0.1' },
+      } as unknown as Request;
+
+      const ip = getClientIp(req);
+      expect(ip).toBe('203.0.113.1');
+    });
+
+    it('should preserve regular IPv4 addresses', () => {
+      const req = {
+        headers: {},
+        socket: { remoteAddress: '192.30.252.1' },
+      } as unknown as Request;
+
+      const ip = getClientIp(req);
+      expect(ip).toBe('192.30.252.1');
+    });
+
+    it('should preserve regular IPv6 addresses', () => {
+      const req = {
+        headers: {},
+        socket: { remoteAddress: '2a0a:a440:0:0:0:0:0:1' },
+      } as unknown as Request;
+
+      const ip = getClientIp(req);
+      expect(ip).toBe('2a0a:a440:0:0:0:0:0:1');
     });
   });
 });
