@@ -8,6 +8,7 @@ A GitHub App that automatically resolves merge conflicts, fixes CI failures, app
 - 🔧 **CI Failure Fixes**: Analyzes failed CI runs and applies fixes automatically
 - 📝 **Patch Application**: Applies patches and updates to keep PRs current
 - 📡 **Real-time Monitoring**: Listens to GitHub webhooks for instant updates
+- 🔒 **Enhanced Security**: IP restrictions and webhook signature verification
 - ☁️ **Cloud-Ready**: Designed to run on Google Cloud Run
 
 ## Prerequisites
@@ -50,12 +51,31 @@ cp .env.example .env
 Edit `.env` with your values:
 
 ```env
+# GitHub App Configuration
 GITHUB_APP_ID=your_app_id
 GITHUB_PRIVATE_KEY="your_private_key"
 GITHUB_WEBHOOK_SECRET=your_webhook_secret
+
+# Server Configuration
 PORT=3000
 NODE_ENV=development
+
+# Webhook Security (Optional)
+# Enable/disable IP address validation (default: true)
+WEBHOOK_IP_RESTRICTION_ENABLED=true
+# Fail-open or fail-closed mode (default: false)
+WEBHOOK_IP_FAIL_OPEN=false
 ```
+
+**Environment Variables Explained:**
+
+- `GITHUB_APP_ID`: Your GitHub App's ID (found in app settings)
+- `GITHUB_PRIVATE_KEY`: Your GitHub App's private key (use quotes if it contains newlines)
+- `GITHUB_WEBHOOK_SECRET`: Secret used to verify webhook signatures (set when creating the app)
+- `PORT`: Port number for the server (default: 3000)
+- `NODE_ENV`: Environment mode (`development` or `production`)
+- `WEBHOOK_IP_RESTRICTION_ENABLED`: Enable IP restrictions (set to `false` for local testing)
+- `WEBHOOK_IP_FAIL_OPEN`: Allow requests when IP validation fails (set to `true` for fail-open mode)
 
 ### 4. Build the Project
 
@@ -93,7 +113,8 @@ CiKnight/
 │   ├── types/                # TypeScript type definitions
 │   │   └── index.ts
 │   └── utils/                # Utility functions
-│       └── helpers.ts
+│       ├── helpers.ts        # General helper functions
+│       └── security.ts       # Webhook security utilities
 ├── tests/                    # Test files
 │   ├── unit/                 # Unit tests
 │   └── integration/          # Integration tests
@@ -257,7 +278,7 @@ gcloud run deploy ciknight \
   --allow-unauthenticated \
   --port 8080 \
   --timeout 60 \
-  --set-env-vars "GITHUB_APP_ID=your_app_id,GITHUB_WEBHOOK_SECRET=your_secret,PORT=8080" \
+  --set-env-vars "GITHUB_APP_ID=your_app_id,GITHUB_WEBHOOK_SECRET=your_secret,PORT=8080,WEBHOOK_IP_RESTRICTION_ENABLED=true,WEBHOOK_IP_FAIL_OPEN=false" \
   --set-secrets "GITHUB_PRIVATE_KEY=github-private-key:latest"
 ```
 
@@ -265,6 +286,8 @@ gcloud run deploy ciknight \
 - `--port 8080`: Specifies the port the container listens on
 - `--timeout 60`: Extended timeout for startup (default is 300s, but explicitly set for clarity)
 - `PORT=8080`: Environment variable that the app uses to bind to the correct port
+- `WEBHOOK_IP_RESTRICTION_ENABLED=true`: Enable IP restrictions for production security
+- `WEBHOOK_IP_FAIL_OPEN=false`: Use fail-closed mode for maximum security
 
 Alternatively, use the provided deployment script:
 
@@ -306,10 +329,75 @@ export GITHUB_WEBHOOK_SECRET=your_webhook_secret
 
 ## Security
 
-- Store your GitHub App private key securely (use Secret Manager in production)
-- Always verify webhook signatures
-- Use environment variables for sensitive configuration
-- Never commit `.env` files to version control
+CiKnight implements multiple layers of security to ensure only legitimate GitHub webhook events are processed:
+
+### Webhook Signature Verification
+
+All incoming webhook requests are automatically verified using HMAC SHA-256 signatures. The application:
+
+- Validates the `X-Hub-Signature-256` header against the computed HMAC of the request body
+- Uses timing-safe comparison to prevent timing attacks
+- Rejects requests with invalid or missing signatures
+
+**Setup:**
+1. When creating your GitHub App, set a webhook secret
+2. Add the secret to your `.env` file:
+   ```env
+   GITHUB_WEBHOOK_SECRET=your_webhook_secret
+   ```
+
+### IP Address Restrictions
+
+CiKnight can restrict webhook requests to only GitHub's official IP ranges, providing an additional layer of security:
+
+- Automatically fetches GitHub's webhook IP ranges from the [GitHub Meta API](https://api.github.com/meta)
+- Validates both IPv4 and IPv6 addresses against GitHub's CIDR ranges
+- Caches IP ranges for 1 hour to reduce API calls
+- Returns `403 Forbidden` for requests from unauthorized IPs
+
+**Configuration:**
+
+Enable IP restrictions (enabled by default):
+```env
+WEBHOOK_IP_RESTRICTION_ENABLED=true
+```
+
+Disable IP restrictions if needed (e.g., for local testing):
+```env
+WEBHOOK_IP_RESTRICTION_ENABLED=false
+```
+
+**Fail-Open vs Fail-Closed Mode:**
+
+Configure behavior when IP validation encounters errors:
+
+```env
+# Fail-closed (default, recommended for production)
+# Rejects requests when IP validation fails
+WEBHOOK_IP_FAIL_OPEN=false
+
+# Fail-open (use with caution)
+# Allows requests when IP validation fails
+WEBHOOK_IP_FAIL_OPEN=true
+```
+
+**Note:** For local development, you may want to disable IP restrictions since your local server won't receive requests from GitHub's IP ranges. When deploying to production, keep IP restrictions enabled for maximum security.
+
+### Rate Limiting
+
+The webhook endpoint includes rate limiting to prevent abuse:
+- Maximum 100 requests per minute per IP address
+- Automatically returns `429 Too Many Requests` when limit is exceeded
+
+### Best Practices
+
+- **Store secrets securely**: Use Secret Manager or similar services in production
+- **Use environment variables**: Never commit `.env` files to version control
+- **Monitor logs**: Watch for rejected webhook requests that might indicate attacks
+- **Keep dependencies updated**: Regularly update npm packages to patch security vulnerabilities
+- **Enable IP restrictions**: Always enable IP restrictions in production environments
+- **Use HTTPS**: Ensure your webhook endpoint uses HTTPS in production
+- **Verify webhook signatures**: Signature validation is enabled by default and should never be disabled
 
 ## Contributing
 
