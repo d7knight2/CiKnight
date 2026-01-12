@@ -86,14 +86,20 @@ export async function fetchGitHubIpRanges(): Promise<string[]> {
  * @internal
  */
 export function normalizeIpv6MappedIpv4(ip: string): string {
+  // IPv4 octet pattern: matches 0-255 only
+  const ipv4Pattern =
+    '(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)';
+
   // Check for IPv6-mapped IPv4 address format: ::ffff:x.x.x.x or ::FFFF:x.x.x.x
-  const mappedMatch = ip.match(/^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/i);
+  const mappedRegex = new RegExp(`^::ffff:(${ipv4Pattern})$`, 'i');
+  const mappedMatch = ip.match(mappedRegex);
   if (mappedMatch) {
     return mappedMatch[1];
   }
 
   // Check for full IPv6-mapped IPv4 format: 0:0:0:0:0:ffff:x.x.x.x
-  const fullMappedMatch = ip.match(/^0:0:0:0:0:ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/i);
+  const fullMappedRegex = new RegExp(`^0:0:0:0:0:ffff:(${ipv4Pattern})$`, 'i');
+  const fullMappedMatch = ip.match(fullMappedRegex);
   if (fullMappedMatch) {
     return fullMappedMatch[1];
   }
@@ -142,7 +148,7 @@ function isIpInCidr(ip: string, cidr: string): boolean {
   if (normalizedIp.includes(':') && cidr.includes(':')) {
     // For simplicity, we'll do a basic prefix match
     const [range, bits] = cidr.split('/');
-    if (!bits) return ip === range;
+    if (!bits) return normalizedIp === range;
 
     // Normalize IPv6 addresses
     const normalizeIPv6 = (addr: string): string => {

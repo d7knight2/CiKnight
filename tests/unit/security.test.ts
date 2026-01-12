@@ -315,6 +315,20 @@ describe('Security Functions', () => {
       // Non-mapped IPv6 with ffff in different position
       expect(normalizeIpv6MappedIpv4('ffff::1')).toBe('ffff::1');
     });
+
+    it('should reject invalid IPv4 addresses (octets > 255)', () => {
+      // IPv4 addresses with octets > 255 should not be normalized
+      expect(normalizeIpv6MappedIpv4('::ffff:300.400.500.600')).toBe('::ffff:300.400.500.600');
+      expect(normalizeIpv6MappedIpv4('::ffff:256.0.0.1')).toBe('::ffff:256.0.0.1');
+      expect(normalizeIpv6MappedIpv4('0:0:0:0:0:ffff:300.1.2.3')).toBe('0:0:0:0:0:ffff:300.1.2.3');
+    });
+
+    it('should handle boundary IPv4 values (0 and 255)', () => {
+      // Valid boundary values should normalize correctly
+      expect(normalizeIpv6MappedIpv4('::ffff:0.0.0.0')).toBe('0.0.0.0');
+      expect(normalizeIpv6MappedIpv4('::ffff:255.255.255.255')).toBe('255.255.255.255');
+      expect(normalizeIpv6MappedIpv4('0:0:0:0:0:ffff:192.0.0.255')).toBe('192.0.0.255');
+    });
   });
 
   describe('getClientIp', () => {
