@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { Webhooks } from '@octokit/webhooks';
+import { createHmac } from 'crypto';
 import { handlePullRequest } from './github/pull-request';
 import { handleCheckRun } from './github/check-run';
 
@@ -7,6 +8,84 @@ import { handleCheckRun } from './github/check-run';
 const webhookSecret = process.env.GITHUB_WEBHOOK_SECRET;
 if (!webhookSecret) {
   throw new Error('GITHUB_WEBHOOK_SECRET environment variable is required');
+}
+
+/**
+ * Calculate the expected signature for webhook verification
+ */
+function calculateExpectedSignature(payload: string, secret: string): string {
+  return 'sha256=' + createHmac('sha256', secret).update(payload, 'utf8').digest('hex');
+}
+
+/**
+ * Detect common causes of signature mismatches and provide actionable suggestions
+ */
+function detectSignatureMismatch(
+  receivedSignature: string,
+  expectedSignature: string,
+  payload: string
+): string[] {
+  const suggestions: string[] = [];
+
+  // Check if signatures are completely different (likely wrong secret)
+  if (receivedSignature && expectedSignature && receivedSignature !== expectedSignature) {
+    suggestions.push('❌ Signature mismatch detected');
+    suggestions.push(
+      '💡 Possible causes:\n' +
+        '   1. Incorrect GITHUB_WEBHOOK_SECRET - Verify the secret matches your GitHub App configuration\n' +
+        '   2. Payload mutation - Check if body-parser middleware is modifying the request body\n' +
+        '   3. Double-parsing - Ensure only one JSON parser is processing the webhook'
+    );
+  }
+
+  // Check for signs of payload mutation (missing rawBody or empty payload)
+  if (!payload || payload.length === 0) {
+    suggestions.push(
+      '⚠️  Empty or missing payload detected\n' +
+        '💡 This usually indicates double-parsing or missing rawBody middleware'
+    );
+  }
+
+  // Check if payload looks like it was parsed and re-stringified
+  try {
+    const parsed = JSON.parse(payload);
+    const reStringified = JSON.stringify(parsed);
+    if (reStringified !== payload) {
+      suggestions.push(
+        '⚠️  Payload appears to have been modified (spacing/formatting changes)\n' +
+          '💡 Ensure express.json middleware uses the "verify" option to preserve rawBody'
+      );
+    }
+  } catch {
+    suggestions.push(
+      '⚠️  Payload is not valid JSON - this will cause signature verification to fail'
+    );
+  }
+
+  return suggestions;
+}
+
+/**
+ * Log structured debugging information for webhook verification
+ */
+function logDebugInfo(
+  event: string,
+  deliveryId: string,
+  receivedSignature: string,
+  expectedSignature: string,
+  payloadHash: string
+): void {
+  // Check debug mode at runtime to allow dynamic enabling
+  const isDebugMode = process.env.WEBHOOK_DEBUG === 'true';
+  if (!isDebugMode) return;
+
+  console.log('🔍 [DEBUG] Webhook Verification Details:');
+  console.log(`   Event: ${event}`);
+  console.log(`   Delivery ID: ${deliveryId}`);
+  console.log(`   Received Signature: ${receivedSignature}`);
+  console.log(`   Expected Signature: ${expectedSignature}`);
+  console.log(`   Payload Hash (SHA-256): ${payloadHash}`);
+  console.log(`   Signatures Match: ${receivedSignature === expectedSignature}`);
 }
 
 // Initialize webhooks
@@ -79,19 +158,37 @@ webhooks.onError((error) => {
 
 // Webhook handler for Express
 export const webhookHandler = async (req: Request, res: Response): Promise<Response> => {
-  try {
-    const signature = req.headers['x-hub-signature-256'] as string;
-    const event = req.headers['x-github-event'] as string;
-    const id = req.headers['x-github-delivery'] as string;
+  const signature = req.headers['x-hub-signature-256'] as string;
+  const event = req.headers['x-github-event'] as string;
+  const id = req.headers['x-github-delivery'] as string;
 
+  // Enhanced logging: Log all webhook attempts with event and delivery ID
+  console.log(`📬 Webhook received: event=${event}, delivery_id=${id}`);
+
+  try {
     if (!signature || !event || !id) {
+      console.warn(
+        `⚠️  Missing required headers: signature=${!!signature}, event=${!!event}, id=${!!id}`
+      );
       return res.status(400).json({ error: 'Missing required webhook headers' });
     }
 
     // Use rawBody for signature verification, req.body is already parsed JSON
     const rawBody = (req as any).rawBody;
     if (!rawBody) {
+      console.error(
+        '❌ Missing raw body for verification - check body-parser middleware configuration'
+      );
+      console.error('💡 Ensure express.json() uses the "verify" option to preserve rawBody');
       return res.status(400).json({ error: 'Missing raw body for verification' });
+    }
+
+    // Debug mode: Log verification details
+    const isDebugMode = process.env.WEBHOOK_DEBUG === 'true';
+    if (isDebugMode) {
+      const expectedSignature = calculateExpectedSignature(rawBody, webhookSecret);
+      const payloadHash = createHmac('sha256', rawBody).digest('hex');
+      logDebugInfo(event, id, signature, expectedSignature, payloadHash);
     }
 
     // Owner verification for pull_request events (before signature verification for efficiency)
@@ -107,7 +204,9 @@ export const webhookHandler = async (req: Request, res: Response): Promise<Respo
       }
 
       if (repoOwner !== 'd7knight2') {
-        console.warn(`🚫 Unauthorized webhook: Repository owner '${repoOwner}' is not 'd7knight2'`);
+        console.warn(
+          `🚫 Unauthorized webhook: event=${event}, delivery_id=${id}, owner=${repoOwner} (expected: d7knight2)`
+        );
         return res.status(403).json({
           error: 'Forbidden',
           message:
@@ -116,6 +215,7 @@ export const webhookHandler = async (req: Request, res: Response): Promise<Respo
       }
     }
 
+    // Verify signature and process webhook
     await webhooks.verifyAndReceive({
       id,
       name: event as any, // GitHub sends various event names, type system can't enumerate all
@@ -123,10 +223,28 @@ export const webhookHandler = async (req: Request, res: Response): Promise<Respo
       payload: rawBody,
     });
 
-    console.log(`✅ Webhook verified and processed successfully: ${event} (${id})`);
+    console.log(`✅ Webhook verified and processed: event=${event}, delivery_id=${id}`);
     return res.status(200).json({ message: 'Webhook received' });
   } catch (error: any) {
-    console.error('❌ Error processing webhook:', error);
+    // Enhanced error logging for signature verification failures
+    console.error(`❌ Webhook processing failed: event=${event}, delivery_id=${id}`);
+    console.error(`   Error: ${error.message}`);
+
+    // Detect and log common signature mismatch causes
+    if (error.message && error.message.includes('signature')) {
+      const rawBody = (req as any).rawBody || '';
+      const expectedSignature = calculateExpectedSignature(rawBody, webhookSecret);
+      const suggestions = detectSignatureMismatch(signature, expectedSignature, rawBody);
+
+      suggestions.forEach((suggestion) => console.error(suggestion));
+
+      // Always log debug info on signature failures, even if debug mode is off
+      const isDebugMode = process.env.WEBHOOK_DEBUG === 'true';
+      if (!isDebugMode) {
+        console.error('💡 Enable WEBHOOK_DEBUG=true for detailed signature verification logs');
+      }
+    }
+
     return res.status(500).json({ error: 'Internal server error', message: error.message });
   }
 };
