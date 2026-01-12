@@ -70,7 +70,9 @@ export const webhookHandler = async (req: Request, res: Response): Promise<Respo
       return res.status(400).json({ error: 'Missing raw body for verification' });
     }
 
-    // Owner verification for pull_request events
+    // Owner verification for pull_request events (before signature verification for efficiency)
+    // Note: This check happens before signature verification to quickly reject unauthorized
+    // webhooks and reduce processing overhead. GitHub's signature is still verified after this check.
     if (event.startsWith('pull_request')) {
       const payload = JSON.parse(rawBody);
       const repoOwner = payload.repository?.owner?.login;
