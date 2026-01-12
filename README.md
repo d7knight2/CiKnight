@@ -398,6 +398,82 @@ The webhook endpoint includes rate limiting to prevent abuse:
 - **Enable IP restrictions**: Always enable IP restrictions in production environments
 - **Use HTTPS**: Ensure your webhook endpoint uses HTTPS in production
 - **Verify webhook signatures**: Signature validation is enabled by default and should never be disabled
+### Webhook Security
+
+CiKnight implements multiple layers of security to protect against unauthorized webhook usage:
+
+#### 1. Webhook Signature Verification
+- All incoming webhooks are verified using the `GITHUB_WEBHOOK_SECRET`
+- Invalid signatures are automatically rejected
+- This ensures webhooks are genuinely from GitHub
+
+#### 2. Repository Owner Verification
+- **CiKnight only processes pull requests for repositories owned by `d7knight2`**
+- Pull request webhooks from other repository owners are rejected with a `403 Forbidden` status
+- This prevents unauthorized use of the webhook by other users or projects
+
+**How it works:**
+- When a `pull_request` event is received, CiKnight checks the repository owner (`payload.repository.owner.login`)
+- If the owner is not `d7knight2`, the webhook is immediately rejected
+- This check happens before any event processing or API calls
+
+**Testing the owner verification:**
+
+To verify that CiKnight properly rejects unauthorized webhooks:
+
+1. **Using curl (simulated webhook):**
+```bash
+# This will be rejected (403 Forbidden)
+curl -X POST http://localhost:3000/webhook \
+  -H "Content-Type: application/json" \
+  -H "x-github-event: pull_request" \
+  -H "x-github-delivery: test-123" \
+  -H "x-hub-signature-256: sha256=test" \
+  -d '{
+    "pull_request": {"number": 1},
+    "repository": {
+      "owner": {"login": "unauthorized-user"},
+      "name": "test-repo"
+    }
+  }'
+```
+
+2. **Checking logs:**
+When an unauthorized webhook is received, you'll see in the logs:
+```
+🚫 Unauthorized webhook: Repository owner 'unauthorized-user' is not 'd7knight2'
+```
+
+3. **Expected responses:**
+- `200 OK` - Webhook from `d7knight2` repository processed successfully
+- `403 Forbidden` - Webhook from non-`d7knight2` repository rejected
+- `400 Bad Request` - Missing required headers or invalid payload structure
+
+#### 3. Additional Security Best Practices
+
+- Store your GitHub App private key securely (use Secret Manager in production)
+- Always verify webhook signatures
+- Use environment variables for sensitive configuration
+- Never commit `.env` files to version control
+- Enable rate limiting on the webhook endpoint (configured to 100 requests/minute)
+
+### Security Testing
+
+Run the comprehensive test suite to verify all security features:
+
+```bash
+# Run all tests including security tests
+npm test
+
+# Run specific webhook security tests
+npm test -- webhook.test.ts
+```
+
+The test suite includes:
+- Owner verification for various scenarios
+- Webhook signature validation
+- Malformed payload handling
+- Edge cases and error conditions
 
 ## Contributing
 
