@@ -45,7 +45,7 @@ const ipRestrictionMiddleware = async (
       console.log('⚠️  IP restriction check failed, allowing request (fail-open mode)');
       next();
     } else {
-      res.status(500).json({ error: 'Internal server error during IP validation' });
+      res.status(403).json({ error: 'Forbidden' });
     }
   }
 };

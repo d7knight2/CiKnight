@@ -1,4 +1,3 @@
-import crypto from 'crypto';
 import { Request } from 'express';
 
 // GitHub Meta API response type
@@ -18,6 +17,7 @@ interface GitHubMeta {
 let ipRangesCache: string[] = [];
 let lastFetchTime = 0;
 const CACHE_DURATION = 3600000; // 1 hour in milliseconds
+let fetchInProgress: Promise<string[]> | null = null;
 
 /**
  * Clear the IP ranges cache (useful for testing)
@@ -26,11 +26,13 @@ const CACHE_DURATION = 3600000; // 1 hour in milliseconds
 export function clearIpCache(): void {
   ipRangesCache = [];
   lastFetchTime = 0;
+  fetchInProgress = null;
 }
 
 /**
  * Fetches GitHub's webhook IP ranges from the GitHub Meta API
  * Results are cached for 1 hour to reduce API calls
+ * Prevents race conditions by ensuring only one fetch happens at a time
  */
 export async function fetchGitHubIpRanges(): Promise<string[]> {
   const now = Date.now();
@@ -40,27 +42,40 @@ export async function fetchGitHubIpRanges(): Promise<string[]> {
     return ipRangesCache;
   }
 
-  try {
-    const response = await fetch('https://api.github.com/meta');
-    if (!response.ok) {
-      throw new Error(`GitHub API returned ${response.status}`);
-    }
-
-    const data = (await response.json()) as GitHubMeta;
-    ipRangesCache = data.hooks || [];
-    lastFetchTime = now;
-
-    console.log(`✅ Fetched ${ipRangesCache.length} GitHub webhook IP ranges`);
-    return ipRangesCache;
-  } catch (error) {
-    console.error('❌ Error fetching GitHub IP ranges:', error);
-    // If we have cached ranges, use them even if expired
-    if (ipRangesCache.length > 0) {
-      console.log('⚠️  Using cached IP ranges due to fetch error');
-      return ipRangesCache;
-    }
-    throw error;
+  // If a fetch is already in progress, wait for it
+  if (fetchInProgress) {
+    return fetchInProgress;
   }
+
+  // Start a new fetch and store the promise
+  fetchInProgress = (async () => {
+    try {
+      const response = await fetch('https://api.github.com/meta');
+      if (!response.ok) {
+        throw new Error(`GitHub API returned ${response.status}`);
+      }
+
+      const data = (await response.json()) as GitHubMeta;
+      ipRangesCache = data.hooks || [];
+      lastFetchTime = now;
+
+      console.log(`✅ Fetched ${ipRangesCache.length} GitHub webhook IP ranges`);
+      return ipRangesCache;
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('❌ Error fetching GitHub IP ranges:', message);
+      // If we have cached ranges, use them even if expired
+      if (ipRangesCache.length > 0) {
+        console.log('⚠️  Using cached IP ranges due to fetch error');
+        return ipRangesCache;
+      }
+      throw error;
+    } finally {
+      fetchInProgress = null;
+    }
+  })();
+
+  return fetchInProgress;
 }
 
 /**
@@ -72,8 +87,8 @@ function isIpInCidr(ip: string, cidr: string): boolean {
     const [range, bits] = cidr.split('/');
     // Calculate IPv4 CIDR mask: ~(2^(32-prefix_bits) - 1) converts prefix to netmask
     // Example: /24 -> ~(2^8 - 1) = ~255 = 0xFFFFFF00
-    // The >>> 0 ensures the result is treated as an unsigned 32-bit integer
-    const mask = bits ? ~(2 ** (32 - parseInt(bits)) - 1) >>> 0 : 0xffffffff;
+    // Using bit shifting for more explicit unsigned integer handling
+    const mask = bits ? (-1 << (32 - parseInt(bits))) >>> 0 : 0xffffffff;
 
     const ipNum = ip.split('.').reduce((acc, octet) => (acc << 8) + parseInt(octet), 0) >>> 0;
     const rangeNum = range.split('.').reduce((acc, octet) => (acc << 8) + parseInt(octet), 0) >>> 0;
@@ -82,6 +97,9 @@ function isIpInCidr(ip: string, cidr: string): boolean {
   }
 
   // Handle IPv6 (basic implementation)
+  // Note: This handles standard IPv6 CIDR matching for GitHub's webhook IP ranges.
+  // Limitations: Does not support IPv4-mapped IPv6 addresses (e.g., ::ffff:192.0.2.1).
+  // Validates standard IPv6 formats used by GitHub's Meta API.
   if (ip.includes(':') && cidr.includes(':')) {
     // For simplicity, we'll do a basic prefix match
     const [range, bits] = cidr.split('/');
@@ -173,56 +191,32 @@ export async function isValidGitHubIp(ip: string): Promise<boolean> {
 
 /**
  * Extracts the client IP from the request, considering proxies
+ * Note: Only trusts proxy headers when TRUST_PROXY environment variable is set to 'true'.
+ * This prevents header spoofing attacks in direct connections.
  */
 export function getClientIp(req: Request): string {
-  // Check for X-Forwarded-For header (common in proxied environments)
-  const forwardedFor = req.headers['x-forwarded-for'];
-  if (forwardedFor) {
-    // X-Forwarded-For can contain multiple IPs, take the first one
-    const ips = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor;
-    return ips.split(',')[0].trim();
+  const trustProxy = process.env.TRUST_PROXY === 'true';
+
+  // Only trust forwarding headers if explicitly configured
+  if (trustProxy) {
+    // Check for X-Forwarded-For header (common in proxied environments)
+    const forwardedFor = req.headers['x-forwarded-for'];
+    if (forwardedFor) {
+      // X-Forwarded-For can contain multiple IPs, take the first one
+      const ips = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor;
+      return ips.split(',')[0].trim();
+    }
+
+    // Check for X-Real-IP header
+    const realIp = req.headers['x-real-ip'];
+    if (realIp) {
+      return Array.isArray(realIp) ? realIp[0] : realIp;
+    }
   }
 
-  // Check for X-Real-IP header
-  const realIp = req.headers['x-real-ip'];
-  if (realIp) {
-    return Array.isArray(realIp) ? realIp[0] : realIp;
-  }
-
-  // Fall back to socket address
+  // Fall back to socket address (always trusted)
   return req.socket.remoteAddress || '';
 }
 
-/**
- * Verifies the webhook signature using HMAC SHA-256
- */
-export function verifyWebhookSignature(
-  payload: string,
-  signature: string,
-  secret: string
-): boolean {
-  if (!signature || !secret || !payload) {
-    return false;
-  }
-
-  try {
-    // GitHub sends signature in format: sha256=<hash>
-    const expectedSignature = signature.startsWith('sha256=') ? signature.substring(7) : signature;
-
-    // Compute HMAC SHA-256
-    const hmac = crypto.createHmac('sha256', secret);
-    hmac.update(payload);
-    const computed = hmac.digest('hex');
-
-    // Ensure both strings are the same length before comparison
-    if (expectedSignature.length !== computed.length) {
-      return false;
-    }
-
-    // Use timing-safe comparison to prevent timing attacks
-    return crypto.timingSafeEqual(Buffer.from(expectedSignature), Buffer.from(computed));
-  } catch (error) {
-    console.error('❌ Error verifying webhook signature:', error);
-    return false;
-  }
-}
+// Note: Webhook signature verification is handled by @octokit/webhooks.verifyAndReceive
+// in src/webhook.ts, which provides built-in HMAC SHA-256 validation.
