@@ -70,7 +70,7 @@ function isIpInCidr(ip: string, cidr: string): boolean {
   // Handle IPv4
   if (ip.includes('.') && cidr.includes('.')) {
     const [range, bits] = cidr.split('/');
-    const mask = bits ? ~(2 ** (32 - parseInt(bits)) - 1) : 0xffffffff;
+    const mask = bits ? ~(2 ** (32 - parseInt(bits)) - 1) >>> 0 : 0xffffffff;
 
     const ipNum = ip.split('.').reduce((acc, octet) => (acc << 8) + parseInt(octet), 0) >>> 0;
     const rangeNum = range.split('.').reduce((acc, octet) => (acc << 8) + parseInt(octet), 0) >>> 0;
@@ -120,6 +120,10 @@ function isIpInCidr(ip: string, cidr: string): boolean {
 
     // Compare remaining bits if any
     if (remainingBits > 0 && hexGroups < 8) {
+      // Add bounds checking to prevent undefined access
+      if (hexGroups >= ipParts.length || hexGroups >= rangeParts.length) {
+        return false;
+      }
       const ipHex = parseInt(ipParts[hexGroups], 16);
       const rangeHex = parseInt(rangeParts[hexGroups], 16);
       const mask = (0xffff << (16 - remainingBits)) & 0xffff;

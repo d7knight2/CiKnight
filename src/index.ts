@@ -16,7 +16,8 @@ const ipRestrictionMiddleware = async (
   res: express.Response,
   next: express.NextFunction
 ) => {
-  // Skip IP restriction if disabled
+  // Skip IP restriction if explicitly disabled
+  // By default, IP restrictions are ENABLED (when env var is undefined or any value except 'false')
   const enableIpRestriction = process.env.WEBHOOK_IP_RESTRICTION_ENABLED !== 'false';
   if (!enableIpRestriction) {
     return next();
