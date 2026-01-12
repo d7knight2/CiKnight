@@ -87,8 +87,8 @@ export async function fetchGitHubIpRanges(): Promise<string[]> {
  */
 export function normalizeIpv6MappedIpv4(ip: string): string {
   // IPv4 octet pattern: matches 0-255 only
-  const ipv4Pattern =
-    '(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)';
+  const IPV4_OCTET = '(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)';
+  const ipv4Pattern = `${IPV4_OCTET}\\.${IPV4_OCTET}\\.${IPV4_OCTET}\\.${IPV4_OCTET}`;
 
   // Check for IPv6-mapped IPv4 address format: ::ffff:x.x.x.x or ::FFFF:x.x.x.x
   const mappedRegex = new RegExp(`^::ffff:(${ipv4Pattern})$`, 'i');
@@ -105,6 +105,8 @@ export function normalizeIpv6MappedIpv4(ip: string): string {
   }
 
   // Check for IPv6-mapped IPv4 in hex notation: ::ffff:c000:0201 -> 192.0.2.1
+  // Note: Hex values can be up to 0xFFFF (65535), but each represents two octets
+  // so the individual octets are always valid (0-255) after bitwise extraction
   const hexMappedMatch = ip.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/i);
   if (hexMappedMatch) {
     const high = parseInt(hexMappedMatch[1], 16);

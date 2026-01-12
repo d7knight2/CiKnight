@@ -295,6 +295,10 @@ describe('Security Functions', () => {
       expect(normalizeIpv6MappedIpv4('::ffff:c01e:fc01')).toBe('192.30.252.1');
       // 0a00:0001 = 10.0.0.1
       expect(normalizeIpv6MappedIpv4('::ffff:0a00:0001')).toBe('10.0.0.1');
+      // ffff:ffff = 255.255.255.255 (max valid value)
+      expect(normalizeIpv6MappedIpv4('::ffff:ffff:ffff')).toBe('255.255.255.255');
+      // 0000:0000 = 0.0.0.0 (min valid value)
+      expect(normalizeIpv6MappedIpv4('::ffff:0000:0000')).toBe('0.0.0.0');
     });
 
     it('should handle standard IPv4 addresses (no normalization needed)', () => {
