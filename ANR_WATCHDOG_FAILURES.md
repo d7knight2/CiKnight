@@ -89,12 +89,29 @@ The test file contains 10 intentionally failing tests across 5 categories:
 
 ## How to Use
 
+### Important: Test Exclusion
+
+The ANR Watchdog test suite is **excluded from the default test run** to prevent intentional failures from blocking development. The exclusion is configured in `jest.config.js`:
+
+```javascript
+testPathIgnorePatterns: [
+  '/node_modules/',
+  '<rootDir>/tests/integration/',
+  '<rootDir>/tests/unit/anr-watchdog.test.ts', // Exclude intentional failure tests
+],
+```
+
 ### Running Individual Failures
 
-To run only the ANR Watchdog test failures:
+To run only the ANR Watchdog test failures explicitly:
 
 ```bash
 npm test -- anr-watchdog.test.ts
+```
+
+Or run with the full path:
+```bash
+npm test -- tests/unit/anr-watchdog.test.ts
 ```
 
 ### Triggering CI Failures
@@ -149,7 +166,8 @@ To remove the failure scenarios:
 
 1. **Remove CI Job**: Delete lines 123-164 from `.github/workflows/ci.yml`
 2. **Remove Test File**: Delete `tests/unit/anr-watchdog.test.ts`
-3. **Remove Documentation**: Delete this README file
+3. **Remove Test Exclusion**: Remove the anr-watchdog.test.ts line from `testPathIgnorePatterns` in `jest.config.js`
+4. **Remove Documentation**: Delete this README file
 
 Or revert the entire change by checking out the previous commit:
 ```bash
