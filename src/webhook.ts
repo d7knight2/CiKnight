@@ -47,6 +47,9 @@ function detectSignatureMismatch(
   }
 
   // Check if payload looks like it was parsed and re-stringified
+  // Check if payload looks like it was parsed and re-stringified
+  // Note: This comparison may have false positives due to JSON key ordering differences
+  // or whitespace variations. It's intended as a heuristic to detect obvious mutations.
   try {
     const parsed = JSON.parse(payload);
     const reStringified = JSON.stringify(parsed);
@@ -238,9 +241,8 @@ export const webhookHandler = async (req: Request, res: Response): Promise<Respo
 
       suggestions.forEach((suggestion) => console.error(suggestion));
 
-      // Always log debug info on signature failures, even if debug mode is off
-      const isDebugMode = process.env.WEBHOOK_DEBUG === 'true';
-      if (!isDebugMode) {
+      // Suggest enabling debug mode if not already enabled
+      if (process.env.WEBHOOK_DEBUG !== 'true') {
         console.error('💡 Enable WEBHOOK_DEBUG=true for detailed signature verification logs');
       }
     }
