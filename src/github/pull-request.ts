@@ -9,11 +9,14 @@ export async function handlePullRequest(payload: any, action: string) {
     console.log(`🔍 Processing PR #${prNumber} in ${owner}/${repo} (action: ${action})`);
 
     // Check if PR is mergeable
+    console.log(`🔍 Fetching PR details for #${prNumber}`);
     const { data: pr } = await octokit.pulls.get({
       owner,
       repo,
       pull_number: prNumber,
     });
+
+    console.log(`📊 PR #${prNumber} mergeable state: ${pr.mergeable_state}`);
 
     if (pr.mergeable_state === 'dirty') {
       console.log(`⚠️  PR #${prNumber} has merge conflicts`);
@@ -27,20 +30,23 @@ export async function handlePullRequest(payload: any, action: string) {
 
     // Add a comment to let users know CiKnight is monitoring
     if (action === 'opened') {
+      console.log(`💬 Posting welcome comment on PR #${prNumber}`);
       await octokit.issues.createComment({
         owner,
         repo,
         issue_number: prNumber,
         body: `🛡️ **CiKnight is now monitoring this PR**\n\nI'll help with:\n- 🔀 Resolving merge conflicts\n- 🔧 Fixing CI failures\n- 📝 Applying patches\n\nStay tuned!`,
       });
+      console.log(`💬 Posted welcome comment on PR #${prNumber}`);
     }
   } catch (error: any) {
-    console.error(`❌ Error handling pull request:`, error.message);
+    console.error(`❌ Error handling pull request:`, error.message, error);
   }
 }
 
 async function handleMergeConflicts(octokit: any, owner: string, repo: string, prNumber: number) {
   try {
+    console.log(`🔀 Processing merge conflicts for PR #${prNumber}`);
     // Comment on the PR about merge conflicts
     await octokit.issues.createComment({
       owner,
@@ -58,6 +64,6 @@ async function handleMergeConflicts(octokit: any, owner: string, repo: string, p
     // 3. Using AI/heuristics to resolve conflicts
     // 4. Creating a new commit with resolved conflicts
   } catch (error: any) {
-    console.error(`❌ Error handling merge conflicts:`, error.message);
+    console.error(`❌ Error handling merge conflicts for PR #${prNumber}:`, error.message, error);
   }
 }

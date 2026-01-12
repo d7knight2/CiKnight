@@ -24,11 +24,12 @@ export async function handleCheckRun(payload: any) {
       return;
     }
 
+    console.log(`📝 Found ${pullRequests.length} pull request(s) associated with failed check`);
     for (const pr of pullRequests) {
       await handleCIFailure(octokit, owner, repo, pr.number, checkRun);
     }
   } catch (error: any) {
-    console.error(`❌ Error handling check run:`, error.message);
+    console.error(`❌ Error handling check run:`, error.message, error);
   }
 }
 
@@ -43,6 +44,7 @@ async function handleCIFailure(
     console.log(`🔧 Handling CI failure for PR #${prNumber}`);
 
     // Comment on the PR about the CI failure
+    console.log(`💬 Creating comment on PR #${prNumber} about CI failure`);
     await octokit.issues.createComment({
       owner,
       repo,
@@ -60,6 +62,6 @@ async function handleCIFailure(
     // 4. Creating a commit with the fixes
     // 5. Pushing to the PR branch
   } catch (error: any) {
-    console.error(`❌ Error handling CI failure:`, error.message);
+    console.error(`❌ Error handling CI failure for PR #${prNumber}:`, error.message, error);
   }
 }
