@@ -263,6 +263,116 @@ describe('Security Functions', () => {
       const result = await isValidGitHubIp('192.30.252.1');
       expect(result).toBe(true);
     });
+
+    it('should reject link-local IP addresses (169.254.x.x)', async () => {
+      // 169.254.169.126 is a link-local IP and should be rejected
+      const result = await isValidGitHubIp('169.254.169.126');
+      expect(result).toBe(false);
+    });
+
+    it('should reject other link-local IP addresses', async () => {
+      const result = await isValidGitHubIp('169.254.1.1');
+      expect(result).toBe(false);
+    });
+
+    it('should validate boundary IPs at start of range', async () => {
+      // 192.30.252.0/22 starts at 192.30.252.0
+      const result = await isValidGitHubIp('192.30.252.0');
+      expect(result).toBe(true);
+    });
+
+    it('should validate boundary IPs at end of range', async () => {
+      // 192.30.252.0/22 ends at 192.30.255.255
+      const result = await isValidGitHubIp('192.30.255.255');
+      expect(result).toBe(true);
+    });
+
+    it('should reject IPs just outside the range', async () => {
+      // 192.30.256.0 is just outside 192.30.252.0/22 range (but invalid IP)
+      // 192.31.0.0 is just outside the range
+      const result = await isValidGitHubIp('192.31.0.0');
+      expect(result).toBe(false);
+    });
+
+    it('should validate IPs in 140.82.112.0/20 range', async () => {
+      // Test various IPs in the 140.82.112.0/20 range
+      const result1 = await isValidGitHubIp('140.82.112.0');
+      const result2 = await isValidGitHubIp('140.82.120.50');
+      const result3 = await isValidGitHubIp('140.82.127.255');
+
+      expect(result1).toBe(true);
+      expect(result2).toBe(true);
+      expect(result3).toBe(true);
+    });
+
+    it('should reject IPs outside 140.82.112.0/20 range', async () => {
+      // 140.82.128.0 is just outside the /20 range
+      const result = await isValidGitHubIp('140.82.128.0');
+      expect(result).toBe(false);
+    });
+
+    it('should handle additional GitHub IP ranges when they are added', async () => {
+      // Clear cache and add 143.55.64.0/20 (potential new GitHub range)
+      clearIpCache();
+      jest.clearAllMocks();
+
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          hooks: [
+            '192.30.252.0/22',
+            '185.199.108.0/22',
+            '140.82.112.0/20',
+            '143.55.64.0/20',
+            '2a0a:a440::/29',
+          ],
+        }),
+      });
+
+      await fetchGitHubIpRanges();
+
+      // Test IPs in the new range
+      const result1 = await isValidGitHubIp('143.55.64.1');
+      const result2 = await isValidGitHubIp('143.55.75.200');
+      const result3 = await isValidGitHubIp('143.55.79.255');
+
+      expect(result1).toBe(true);
+      expect(result2).toBe(true);
+      expect(result3).toBe(true);
+    });
+
+    it('should correctly handle IPv6 addresses with compressed notation', async () => {
+      // Test with compressed IPv6 notation
+      const result = await isValidGitHubIp('2a0a:a440::1');
+      expect(result).toBe(true);
+    });
+
+    it('should validate IPv6 addresses at range boundaries', async () => {
+      // 2a0a:a440::/29 includes addresses from 2a0a:a440:: to 2a0a:a447:ffff:ffff:ffff:ffff:ffff:ffff
+      const result1 = await isValidGitHubIp('2a0a:a440:0:0:0:0:0:0');
+      const result2 = await isValidGitHubIp('2a0a:a447:ffff:ffff:ffff:ffff:ffff:ffff');
+
+      expect(result1).toBe(true);
+      expect(result2).toBe(true);
+    });
+
+    it('should reject IPv6 addresses just outside the range', async () => {
+      // 2a0a:a448:: is just outside the /29 range
+      const result = await isValidGitHubIp('2a0a:a448:0:0:0:0:0:0');
+      expect(result).toBe(false);
+    });
+
+    it('should reject IPv6-mapped IPv4 addresses for link-local IPs', async () => {
+      // ::ffff:169.254.169.126 should be normalized and rejected
+      const result = await isValidGitHubIp('::ffff:169.254.169.126');
+      expect(result).toBe(false);
+    });
+
+    it('should handle IPv6-mapped IPv4 for all GitHub ranges', async () => {
+      // Test IPv6-mapped IPv4 for the 140.82.112.0/20 range
+      const result = await isValidGitHubIp('::ffff:140.82.112.5');
+      expect(result).toBe(true);
+    });
   });
 
   describe('getClientIp', () => {
