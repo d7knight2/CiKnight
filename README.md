@@ -8,7 +8,7 @@ A GitHub App that automatically resolves merge conflicts, fixes CI failures, app
 - 🔧 **CI Failure Fixes**: Analyzes failed CI runs and applies fixes automatically
 - 📝 **Patch Application**: Applies patches and updates to keep PRs current
 - 📡 **Real-time Monitoring**: Listens to GitHub webhooks for instant updates
-- 🔒 **Enhanced Security**: IP restrictions and webhook signature verification
+- 🔒 **Enhanced Security**: Webhook signature verification (IP validation disabled)
 - ☁️ **Cloud-Ready**: Designed to run on Google Cloud Run
 
 ## Prerequisites
@@ -60,11 +60,10 @@ GITHUB_WEBHOOK_SECRET=your_webhook_secret
 PORT=3000
 NODE_ENV=development
 
-# Webhook Security (Optional)
-# Enable/disable IP address validation (default: true)
-WEBHOOK_IP_RESTRICTION_ENABLED=true
-# Fail-open or fail-closed mode (default: false)
-WEBHOOK_IP_FAIL_OPEN=false
+# Webhook Security
+# Note: IP validation is currently DISABLED in the codebase
+# All incoming webhook requests are accepted regardless of IP address
+# Webhook signature verification is still performed by the @octokit/webhooks library
 ```
 
 **Environment Variables Explained:**
@@ -74,8 +73,6 @@ WEBHOOK_IP_FAIL_OPEN=false
 - `GITHUB_WEBHOOK_SECRET`: Secret used to verify webhook signatures (set when creating the app)
 - `PORT`: Port number for the server (default: 3000)
 - `NODE_ENV`: Environment mode (`development` or `production`)
-- `WEBHOOK_IP_RESTRICTION_ENABLED`: Enable IP restrictions (set to `false`, `0`, `no`, or `off` to disable; default: enabled)
-- `WEBHOOK_IP_FAIL_OPEN`: Allow requests when IP validation fails (set to `true` for fail-open mode; default: fail-closed)
 
 ### 4. Build the Project
 
