@@ -3,6 +3,19 @@ import { Request, Response } from 'express';
 // Set environment variable before importing webhook
 process.env.GITHUB_WEBHOOK_SECRET = 'test-webhook-secret';
 
+// Mock logger
+jest.mock('../../src/utils/logger', () => ({
+  logger: {
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    debug: jest.fn(),
+    webhook: jest.fn(),
+    security: jest.fn(),
+    isDebugEnabled: jest.fn().mockReturnValue(false),
+  },
+}));
+
 // Mock the webhooks verifyAndReceive
 jest.mock('@octokit/webhooks', () => {
   return {
@@ -15,6 +28,7 @@ jest.mock('@octokit/webhooks', () => {
 });
 
 import { webhookHandler } from '../../src/webhook';
+import { logger } from '../../src/utils/logger';
 
 describe('Webhook Handler', () => {
   let mockRequest: Partial<Request>;
@@ -38,6 +52,9 @@ describe('Webhook Handler', () => {
         'x-github-delivery': 'test-delivery-id',
       },
     };
+
+    // Clear all mocks
+    jest.clearAllMocks();
   });
 
   describe('Owner Verification', () => {
@@ -223,7 +240,97 @@ describe('Webhook Handler', () => {
       await webhookHandler(mockRequest as Request, mockResponse as Response);
 
       expect(statusMock).toHaveBeenCalledWith(400);
-      expect(jsonMock).toHaveBeenCalledWith({ error: 'Missing raw body for verification' });
+      expect(jsonMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          error: 'Missing raw body for verification',
+        })
+      );
+      expect(logger.security).toHaveBeenCalled();
+    });
+  });
+
+  describe('Signature Verification', () => {
+    test('should log webhook with event name and delivery ID', async () => {
+      const payload = {
+        pull_request: { number: 123 },
+        repository: {
+          owner: { login: 'd7knight2' },
+          name: 'CiKnight',
+        },
+      };
+
+      (mockRequest as any).rawBody = JSON.stringify(payload);
+
+      await webhookHandler(mockRequest as Request, mockResponse as Response);
+
+      expect(logger.webhook).toHaveBeenCalledWith(
+        'Incoming webhook',
+        expect.objectContaining({
+          event: 'pull_request',
+          deliveryId: 'test-delivery-id',
+        })
+      );
+    });
+
+    test('should handle signature verification errors with enhanced logging', async () => {
+      const payload = {
+        pull_request: { number: 123 },
+        repository: {
+          owner: { login: 'd7knight2' },
+          name: 'CiKnight',
+        },
+      };
+
+      (mockRequest as any).rawBody = JSON.stringify(payload);
+
+      // We need to reimport to get a fresh mock
+      jest.resetModules();
+
+      // Mock Webhooks with signature error
+      jest.mock('@octokit/webhooks', () => ({
+        Webhooks: jest.fn().mockImplementation(() => ({
+          on: jest.fn(),
+          onError: jest.fn(),
+          verifyAndReceive: jest.fn().mockRejectedValue(new Error('signature does not match')),
+        })),
+      }));
+
+      const { webhookHandler: testHandler } = require('../../src/webhook');
+
+      await testHandler(mockRequest as Request, mockResponse as Response);
+
+      expect(statusMock).toHaveBeenCalledWith(401);
+      expect(jsonMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          error: 'Webhook signature verification failed',
+          suggestions: expect.any(Array),
+        })
+      );
+    });
+
+    test('should log debug information when debug mode is enabled', async () => {
+      (logger.isDebugEnabled as jest.Mock).mockReturnValue(true);
+
+      const payload = {
+        pull_request: { number: 123 },
+        repository: {
+          owner: { login: 'd7knight2' },
+          name: 'CiKnight',
+        },
+      };
+
+      (mockRequest as any).rawBody = JSON.stringify(payload);
+
+      await webhookHandler(mockRequest as Request, mockResponse as Response);
+
+      expect(logger.debug).toHaveBeenCalledWith(
+        'Webhook signature verification details',
+        expect.objectContaining({
+          receivedSignature: expect.any(String),
+          expectedSignature: expect.any(String),
+          payloadHash: expect.any(String),
+        })
+      );
     });
   });
 });

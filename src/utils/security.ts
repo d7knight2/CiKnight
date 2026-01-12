@@ -1,4 +1,5 @@
 import { Request } from 'express';
+import { logger } from './logger';
 
 // GitHub Meta API response type
 interface GitHubMeta {
@@ -59,14 +60,19 @@ export async function fetchGitHubIpRanges(): Promise<string[]> {
       ipRangesCache = data.hooks || [];
       lastFetchTime = now;
 
-      console.log(`✅ Fetched ${ipRangesCache.length} GitHub webhook IP ranges`);
+      logger.debug('Fetched GitHub webhook IP ranges', {
+        count: ipRangesCache.length,
+        ranges: ipRangesCache,
+      });
       return ipRangesCache;
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
-      console.error('❌ Error fetching GitHub IP ranges:', message);
+      logger.error('Error fetching GitHub IP ranges', { error: message });
       // If we have cached ranges, use them even if expired
       if (ipRangesCache.length > 0) {
-        console.log('⚠️  Using cached IP ranges due to fetch error');
+        logger.warn('Using cached IP ranges due to fetch error', {
+          cacheAge: Math.floor((now - lastFetchTime) / 1000),
+        });
         return ipRangesCache;
       }
       throw error;
@@ -207,11 +213,11 @@ export async function isValidGitHubIp(ip: string): Promise<boolean> {
 
     return false;
   } catch (error) {
-    console.error('❌ Error validating GitHub IP:', error);
+    logger.error('Error validating GitHub IP', { error });
     // Fail open if we can't validate (configurable via env var)
     const failOpen = process.env.WEBHOOK_IP_FAIL_OPEN === 'true';
     if (failOpen) {
-      console.log('⚠️  IP validation failed, allowing request (fail-open mode)');
+      logger.warn('IP validation failed, allowing request (fail-open mode)');
       return true;
     }
     return false;
