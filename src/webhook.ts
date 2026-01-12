@@ -70,6 +70,26 @@ export const webhookHandler = async (req: Request, res: Response): Promise<Respo
       return res.status(400).json({ error: 'Missing raw body for verification' });
     }
 
+    // Owner verification for pull_request events
+    if (event.startsWith('pull_request')) {
+      const payload = JSON.parse(rawBody);
+      const repoOwner = payload.repository?.owner?.login;
+
+      if (!repoOwner) {
+        console.warn('⚠️  Missing repository owner in payload');
+        return res.status(400).json({ error: 'Missing repository owner information' });
+      }
+
+      if (repoOwner !== 'd7knight2') {
+        console.warn(`🚫 Unauthorized webhook: Repository owner '${repoOwner}' is not 'd7knight2'`);
+        return res.status(403).json({
+          error: 'Forbidden',
+          message:
+            'This GitHub App only processes pull requests for repositories owned by d7knight2',
+        });
+      }
+    }
+
     await webhooks.verifyAndReceive({
       id,
       name: event as any, // GitHub sends various event names, type system can't enumerate all
