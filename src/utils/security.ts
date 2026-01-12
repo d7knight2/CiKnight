@@ -79,28 +79,67 @@ export async function fetchGitHubIpRanges(): Promise<string[]> {
 }
 
 /**
+ * Normalizes IPv6-mapped IPv4 addresses to their IPv4 representation
+ * E.g., ::ffff:192.0.2.1 -> 192.0.2.1
+ * @param ip - The IP address to normalize
+ * @returns The normalized IP address
+ * @internal
+ */
+export function normalizeIpv6MappedIpv4(ip: string): string {
+  // Check for IPv6-mapped IPv4 address format: ::ffff:x.x.x.x or ::FFFF:x.x.x.x
+  const mappedMatch = ip.match(/^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/i);
+  if (mappedMatch) {
+    return mappedMatch[1];
+  }
+
+  // Check for full IPv6-mapped IPv4 format: 0:0:0:0:0:ffff:x.x.x.x
+  const fullMappedMatch = ip.match(/^0:0:0:0:0:ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/i);
+  if (fullMappedMatch) {
+    return fullMappedMatch[1];
+  }
+
+  // Check for IPv6-mapped IPv4 in hex notation: ::ffff:c000:0201 -> 192.0.2.1
+  const hexMappedMatch = ip.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/i);
+  if (hexMappedMatch) {
+    const high = parseInt(hexMappedMatch[1], 16);
+    const low = parseInt(hexMappedMatch[2], 16);
+    const octet1 = (high >> 8) & 0xff;
+    const octet2 = high & 0xff;
+    const octet3 = (low >> 8) & 0xff;
+    const octet4 = low & 0xff;
+    return `${octet1}.${octet2}.${octet3}.${octet4}`;
+  }
+
+  // No mapping needed, return original
+  return ip;
+}
+
+/**
  * Checks if an IP address is within a CIDR range
  */
 function isIpInCidr(ip: string, cidr: string): boolean {
+  // Normalize IPv6-mapped IPv4 addresses before checking
+  const normalizedIp = normalizeIpv6MappedIpv4(ip);
+
   // Handle IPv4
-  if (ip.includes('.') && cidr.includes('.')) {
+  if (normalizedIp.includes('.') && cidr.includes('.')) {
     const [range, bits] = cidr.split('/');
     // Calculate IPv4 CIDR mask: ~(2^(32-prefix_bits) - 1) converts prefix to netmask
     // Example: /24 -> ~(2^8 - 1) = ~255 = 0xFFFFFF00
     // Using bit shifting for more explicit unsigned integer handling
     const mask = bits ? (-1 << (32 - parseInt(bits))) >>> 0 : 0xffffffff;
 
-    const ipNum = ip.split('.').reduce((acc, octet) => (acc << 8) + parseInt(octet), 0) >>> 0;
+    const ipNum =
+      normalizedIp.split('.').reduce((acc, octet) => (acc << 8) + parseInt(octet), 0) >>> 0;
     const rangeNum = range.split('.').reduce((acc, octet) => (acc << 8) + parseInt(octet), 0) >>> 0;
 
     return (ipNum & mask) === (rangeNum & mask);
   }
 
-  // Handle IPv6 (basic implementation)
-  // Note: This handles standard IPv6 CIDR matching for GitHub's webhook IP ranges.
-  // Limitations: Does not support IPv4-mapped IPv6 addresses (e.g., ::ffff:192.0.2.1).
-  // Validates standard IPv6 formats used by GitHub's Meta API.
-  if (ip.includes(':') && cidr.includes(':')) {
+  // Handle IPv6 (standard IPv6 addresses)
+  // Note: IPv6-mapped IPv4 addresses are normalized to IPv4 format above.
+  // This section handles standard IPv6 CIDR matching for GitHub's webhook IP ranges.
+  if (normalizedIp.includes(':') && cidr.includes(':')) {
     // For simplicity, we'll do a basic prefix match
     const [range, bits] = cidr.split('/');
     if (!bits) return ip === range;
@@ -123,7 +162,7 @@ function isIpInCidr(ip: string, cidr: string): boolean {
         .join(':');
     };
 
-    const normalizedIp = normalizeIPv6(ip);
+    const normalizedIpv6 = normalizeIPv6(normalizedIp);
     const normalizedRange = normalizeIPv6(range);
 
     // Compare based on prefix length
@@ -131,7 +170,7 @@ function isIpInCidr(ip: string, cidr: string): boolean {
     const hexGroups = Math.floor(prefixLength / 16);
     const remainingBits = prefixLength % 16;
 
-    const ipParts = normalizedIp.split(':');
+    const ipParts = normalizedIpv6.split(':');
     const rangeParts = normalizedRange.split(':');
 
     // Compare full hex groups

@@ -3,6 +3,7 @@ import {
   isValidGitHubIp,
   getClientIp,
   clearIpCache,
+  normalizeIpv6MappedIpv4,
 } from '../../src/utils/security';
 import { Request } from 'express';
 
@@ -211,6 +212,42 @@ describe('Security Functions', () => {
       expect(result).toBe(false);
     });
 
+    it('should validate IPv6-mapped IPv4 addresses in GitHub range', async () => {
+      // ::ffff:192.30.252.1 should map to 192.30.252.1 which is in 192.30.252.0/22
+      const result = await isValidGitHubIp('::ffff:192.30.252.1');
+      expect(result).toBe(true);
+    });
+
+    it('should validate IPv6-mapped IPv4 addresses in hex notation', async () => {
+      // ::ffff:c01e:fc01 should map to 192.30.252.1 which is in 192.30.252.0/22
+      const result = await isValidGitHubIp('::ffff:c01e:fc01');
+      expect(result).toBe(true);
+    });
+
+    it('should validate full format IPv6-mapped IPv4 addresses', async () => {
+      // 0:0:0:0:0:ffff:192.30.252.1 should map to 192.30.252.1
+      const result = await isValidGitHubIp('0:0:0:0:0:ffff:192.30.252.1');
+      expect(result).toBe(true);
+    });
+
+    it('should reject IPv6-mapped IPv4 addresses not in GitHub range', async () => {
+      // ::ffff:10.0.0.1 should map to 10.0.0.1 which is not in any GitHub range
+      const result = await isValidGitHubIp('::ffff:10.0.0.1');
+      expect(result).toBe(false);
+    });
+
+    it('should reject IPv6-mapped IPv4 addresses in hex notation not in range', async () => {
+      // ::ffff:0a00:0001 should map to 10.0.0.1 which is not in any GitHub range
+      const result = await isValidGitHubIp('::ffff:0a00:0001');
+      expect(result).toBe(false);
+    });
+
+    it('should handle case-insensitive IPv6-mapped IPv4 addresses', async () => {
+      // ::FFFF:192.30.252.1 should map to 192.30.252.1
+      const result = await isValidGitHubIp('::FFFF:192.30.252.1');
+      expect(result).toBe(true);
+    });
+
     it('should fail closed by default on error when no cache', async () => {
       // Ensure there is no cached IP data before simulating a network error
       clearIpCache();
@@ -232,6 +269,51 @@ describe('Security Functions', () => {
 
       const result = await isValidGitHubIp('192.30.252.1');
       expect(result).toBe(true);
+    });
+  });
+
+  describe('normalizeIpv6MappedIpv4', () => {
+    it('should normalize ::ffff:x.x.x.x format to IPv4', () => {
+      expect(normalizeIpv6MappedIpv4('::ffff:192.0.2.1')).toBe('192.0.2.1');
+      expect(normalizeIpv6MappedIpv4('::ffff:192.30.252.1')).toBe('192.30.252.1');
+    });
+
+    it('should normalize ::FFFF:x.x.x.x format (case insensitive)', () => {
+      expect(normalizeIpv6MappedIpv4('::FFFF:192.0.2.1')).toBe('192.0.2.1');
+      expect(normalizeIpv6MappedIpv4('::FfFf:192.0.2.1')).toBe('192.0.2.1');
+    });
+
+    it('should normalize full format 0:0:0:0:0:ffff:x.x.x.x', () => {
+      expect(normalizeIpv6MappedIpv4('0:0:0:0:0:ffff:192.0.2.1')).toBe('192.0.2.1');
+      expect(normalizeIpv6MappedIpv4('0:0:0:0:0:FFFF:192.30.252.1')).toBe('192.30.252.1');
+    });
+
+    it('should normalize hex notation ::ffff:xxxx:xxxx to IPv4', () => {
+      // c000:0201 = 192.0.2.1
+      expect(normalizeIpv6MappedIpv4('::ffff:c000:0201')).toBe('192.0.2.1');
+      // c01e:fc01 = 192.30.252.1
+      expect(normalizeIpv6MappedIpv4('::ffff:c01e:fc01')).toBe('192.30.252.1');
+      // 0a00:0001 = 10.0.0.1
+      expect(normalizeIpv6MappedIpv4('::ffff:0a00:0001')).toBe('10.0.0.1');
+    });
+
+    it('should handle standard IPv4 addresses (no normalization needed)', () => {
+      expect(normalizeIpv6MappedIpv4('192.0.2.1')).toBe('192.0.2.1');
+      expect(normalizeIpv6MappedIpv4('10.0.0.1')).toBe('10.0.0.1');
+    });
+
+    it('should handle standard IPv6 addresses (no normalization needed)', () => {
+      expect(normalizeIpv6MappedIpv4('2001:db8::1')).toBe('2001:db8::1');
+      expect(normalizeIpv6MappedIpv4('2a0a:a440:0:0:0:0:0:1')).toBe('2a0a:a440:0:0:0:0:0:1');
+    });
+
+    it('should handle edge cases', () => {
+      // Empty string
+      expect(normalizeIpv6MappedIpv4('')).toBe('');
+      // Invalid formats remain unchanged
+      expect(normalizeIpv6MappedIpv4('invalid')).toBe('invalid');
+      // Non-mapped IPv6 with ffff in different position
+      expect(normalizeIpv6MappedIpv4('ffff::1')).toBe('ffff::1');
     });
   });
 
