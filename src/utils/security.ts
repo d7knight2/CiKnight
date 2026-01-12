@@ -79,15 +79,22 @@ export async function fetchGitHubIpRanges(): Promise<string[]> {
 }
 
 /**
+ * Regex pattern for matching IPv6-mapped IPv4 addresses (::ffff:X.X.X.X)
+ * Each octet is validated to be in the range 0-255
+ */
+const IPV6_MAPPED_IPV4_REGEX = (() => {
+  // Pattern to match a single IPv4 octet (0-255)
+  const octet = '(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)';
+  return new RegExp(`^::ffff:${octet}\\.${octet}\\.${octet}\\.${octet}$`, 'i');
+})();
+
+/**
  * Normalizes IPv6-mapped IPv4 addresses to their IPv4 equivalents
  * Converts addresses like ::ffff:192.0.2.1 to 192.0.2.1
  */
 function normalizeIpv6MappedIpv4(ip: string): string {
   // Check if it's an IPv6-mapped IPv4 address (::ffff:X.X.X.X format)
-  // Regex matches ::ffff: followed by 4 octets (0-255 each)
-  const ipv6MappedIpv4Regex =
-    /^::ffff:(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/i;
-  const match = ip.match(ipv6MappedIpv4Regex);
+  const match = ip.match(IPV6_MAPPED_IPV4_REGEX);
 
   if (match) {
     // Return the IPv4 part (octets 1-4 from regex capture groups)
