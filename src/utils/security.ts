@@ -70,6 +70,9 @@ function isIpInCidr(ip: string, cidr: string): boolean {
   // Handle IPv4
   if (ip.includes('.') && cidr.includes('.')) {
     const [range, bits] = cidr.split('/');
+    // Calculate IPv4 CIDR mask: ~(2^(32-prefix_bits) - 1) converts prefix to netmask
+    // Example: /24 -> ~(2^8 - 1) = ~255 = 0xFFFFFF00
+    // The >>> 0 ensures the result is treated as an unsigned 32-bit integer
     const mask = bits ? ~(2 ** (32 - parseInt(bits)) - 1) >>> 0 : 0xffffffff;
 
     const ipNum = ip.split('.').reduce((acc, octet) => (acc << 8) + parseInt(octet), 0) >>> 0;
@@ -120,7 +123,9 @@ function isIpInCidr(ip: string, cidr: string): boolean {
 
     // Compare remaining bits if any
     if (remainingBits > 0 && hexGroups < 8) {
-      // Add bounds checking to prevent undefined access
+      // Bounds checking prevents undefined access when IPv6 addresses have
+      // insufficient hex groups. This can happen with malformed addresses or
+      // edge cases in the normalization logic.
       if (hexGroups >= ipParts.length || hexGroups >= rangeParts.length) {
         return false;
       }

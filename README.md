@@ -74,8 +74,8 @@ WEBHOOK_IP_FAIL_OPEN=false
 - `GITHUB_WEBHOOK_SECRET`: Secret used to verify webhook signatures (set when creating the app)
 - `PORT`: Port number for the server (default: 3000)
 - `NODE_ENV`: Environment mode (`development` or `production`)
-- `WEBHOOK_IP_RESTRICTION_ENABLED`: Enable IP restrictions (set to `false` for local testing)
-- `WEBHOOK_IP_FAIL_OPEN`: Allow requests when IP validation fails (set to `true` for fail-open mode)
+- `WEBHOOK_IP_RESTRICTION_ENABLED`: Enable IP restrictions (set to `false`, `0`, `no`, or `off` to disable; default: enabled)
+- `WEBHOOK_IP_FAIL_OPEN`: Allow requests when IP validation fails (set to `true` for fail-open mode; default: fail-closed)
 
 ### 4. Build the Project
 
@@ -364,7 +364,14 @@ WEBHOOK_IP_RESTRICTION_ENABLED=true
 
 Disable IP restrictions if needed (e.g., for local testing):
 ```env
+# Any of these values will disable IP restrictions
 WEBHOOK_IP_RESTRICTION_ENABLED=false
+# or
+WEBHOOK_IP_RESTRICTION_ENABLED=0
+# or
+WEBHOOK_IP_RESTRICTION_ENABLED=no
+# or
+WEBHOOK_IP_RESTRICTION_ENABLED=off
 ```
 
 **Fail-Open vs Fail-Closed Mode:**
