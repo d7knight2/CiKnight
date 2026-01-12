@@ -288,8 +288,7 @@ describe('Security Functions', () => {
     });
 
     it('should reject IPs just outside the range', async () => {
-      // 192.30.256.0 is just outside 192.30.252.0/22 range (but invalid IP)
-      // 192.31.0.0 is just outside the range
+      // 192.31.0.0 is just outside the 192.30.252.0/22 range
       const result = await isValidGitHubIp('192.31.0.0');
       expect(result).toBe(false);
     });
@@ -312,7 +311,10 @@ describe('Security Functions', () => {
     });
 
     it('should handle additional GitHub IP ranges when they are added', async () => {
-      // Clear cache and add 143.55.64.0/20 (potential new GitHub range)
+      // Clear cache and mock a response with additional IP ranges
+      // Note: These are test fixtures. The 143.55.64.0/20 range is owned by GitHub
+      // but may or may not be in the actual hooks array. This test verifies that
+      // the validation logic correctly handles new ranges when GitHub adds them.
       clearIpCache();
       jest.clearAllMocks();
 
@@ -323,7 +325,7 @@ describe('Security Functions', () => {
             '192.30.252.0/22',
             '185.199.108.0/22',
             '140.82.112.0/20',
-            '143.55.64.0/20',
+            '143.55.64.0/20', // Additional range for testing
             '2a0a:a440::/29',
           ],
         }),
@@ -331,7 +333,7 @@ describe('Security Functions', () => {
 
       await fetchGitHubIpRanges();
 
-      // Test IPs in the new range
+      // Test IPs in the additional range
       const result1 = await isValidGitHubIp('143.55.64.1');
       const result2 = await isValidGitHubIp('143.55.75.200');
       const result3 = await isValidGitHubIp('143.55.79.255');
