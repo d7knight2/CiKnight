@@ -278,7 +278,7 @@ gcloud run deploy ciknight \
   --allow-unauthenticated \
   --port 8080 \
   --timeout 60 \
-  --set-env-vars "GITHUB_APP_ID=your_app_id,GITHUB_WEBHOOK_SECRET=your_secret,PORT=8080,WEBHOOK_IP_RESTRICTION_ENABLED=true,WEBHOOK_IP_FAIL_OPEN=false" \
+  --set-env-vars "GITHUB_APP_ID=your_app_id,GITHUB_WEBHOOK_SECRET=your_secret,PORT=8080,WEBHOOK_IP_RESTRICTION_ENABLED=true,WEBHOOK_IP_FAIL_OPEN=false,TRUST_PROXY=true" \
   --set-secrets "GITHUB_PRIVATE_KEY=github-private-key:latest"
 ```
 
@@ -288,6 +288,7 @@ gcloud run deploy ciknight \
 - `PORT=8080`: Environment variable that the app uses to bind to the correct port
 - `WEBHOOK_IP_RESTRICTION_ENABLED=true`: Enable IP restrictions for production security
 - `WEBHOOK_IP_FAIL_OPEN=false`: Use fail-closed mode for maximum security
+- `TRUST_PROXY=true`: **REQUIRED** for Cloud Run - trusts X-Forwarded-For header to extract real client IP
 
 Alternatively, use the provided deployment script:
 
@@ -489,6 +490,84 @@ The test suite includes:
 3. Commit your changes (`git commit -m 'Add amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
+
+## Troubleshooting
+
+### Webhook IP Validation Issues
+
+**Problem:** Webhooks are being rejected with `403 Forbidden: IP not in GitHub webhook ranges`, even though they're coming from GitHub.
+
+**Common Causes:**
+
+1. **Running behind a proxy/load balancer (most common)**
+   - When your app runs behind a reverse proxy or load balancer (e.g., Google Cloud Run, AWS ALB, nginx, Cloudflare), the socket IP address will be an internal IP (like `169.254.x.x` or `10.x.x.x`) instead of the actual GitHub IP
+   - The actual GitHub IP is in the `X-Forwarded-For` or `X-Real-IP` header
+
+   **Solution:** Enable `TRUST_PROXY` in your environment:
+   ```env
+   TRUST_PROXY=true
+   ```
+
+   **For Google Cloud Run:**
+   ```bash
+   gcloud run services update ciknight \
+     --update-env-vars TRUST_PROXY=true
+   ```
+
+2. **GitHub IP ranges have changed**
+   - GitHub occasionally adds new IP ranges for webhooks
+   - The app automatically fetches the latest ranges from `https://api.github.com/meta` and caches them for 1 hour
+
+   **Solution:** Wait for the cache to refresh (up to 1 hour) or restart the application to force a fresh fetch
+
+3. **Network issues preventing IP range fetch**
+   - If the app can't fetch GitHub's IP ranges, it will fail closed by default (reject all requests)
+
+   **Solution:** Enable fail-open mode temporarily:
+   ```env
+   WEBHOOK_IP_FAIL_OPEN=true
+   ```
+   ⚠️ **Warning:** This reduces security - only use temporarily for debugging
+
+**Debugging Steps:**
+
+1. **Check the logs** to see what IP address the app is seeing:
+   ```
+   📍 Webhook request from IP: 169.254.169.126
+   ```
+
+2. **If you see an internal IP** (169.254.x.x, 10.x.x.x, 172.16-31.x.x, 192.168.x.x):
+   - You're running behind a proxy
+   - Set `TRUST_PROXY=true`
+
+3. **If you see a public GitHub IP** but it's still rejected:
+   - Check if GitHub has added new IP ranges
+   - Force a cache refresh by restarting the app
+   - Temporarily disable IP restrictions for testing:
+     ```env
+     WEBHOOK_IP_RESTRICTION_ENABLED=false
+     ```
+
+4. **Verify GitHub's current webhook IP ranges:**
+   ```bash
+   curl -s https://api.github.com/meta | jq '.hooks'
+   ```
+
+### Other Common Issues
+
+**Problem:** Webhooks timeout or fail intermittently
+
+**Solution:**
+- Increase Cloud Run timeout: `--timeout 300`
+- Check GitHub App permissions are correct
+- Verify network connectivity to GitHub API
+
+**Problem:** "Missing required webhook headers" error
+
+**Solution:**
+- Ensure your GitHub App webhook is configured correctly
+- Webhook secret must match `GITHUB_WEBHOOK_SECRET`
+- Content-Type should be `application/json`
 
 ## License
 

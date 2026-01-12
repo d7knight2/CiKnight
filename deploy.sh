@@ -41,7 +41,7 @@ gcloud run deploy ${SERVICE_NAME} \
   --platform managed \
   --region ${REGION} \
   --allow-unauthenticated \
-  --set-env-vars "GITHUB_APP_ID=${GITHUB_APP_ID},GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET},NODE_ENV=production,PORT=8080" \
+  --set-env-vars "GITHUB_APP_ID=${GITHUB_APP_ID},GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET},NODE_ENV=production,PORT=8080,WEBHOOK_IP_RESTRICTION_ENABLED=true,WEBHOOK_IP_FAIL_OPEN=false,TRUST_PROXY=true" \
   --set-secrets "GITHUB_PRIVATE_KEY=github-private-key:latest" \
   --memory 512Mi \
   --cpu 1 \
