@@ -350,6 +350,11 @@ describe('Security Functions', () => {
         expect(result).toBe(false);
       });
 
+      it('should reject link-local IPv6 addresses at upper range (feb0::/10)', async () => {
+        const result = await isValidGitHubIp('feb0::1');
+        expect(result).toBe(false);
+      });
+
       it('should reject unique local IPv6 addresses (fc00::/7)', async () => {
         const result = await isValidGitHubIp('fc00::1');
         expect(result).toBe(false);

@@ -191,7 +191,7 @@ function isIpInCidr(ip: string, cidr: string): boolean {
  * Returns true if the IP should be rejected
  */
 function isInvalidIp(ip: string): boolean {
-  // Handle IPv4
+  // Handle IPv4 (note: IPv6-mapped IPv4 addresses are already normalized to IPv4 format by this point)
   if (ip.includes('.') && !ip.includes(':')) {
     const octets = ip.split('.').map((octet) => parseInt(octet, 10));
     if (octets.length !== 4 || octets.some((octet) => isNaN(octet) || octet < 0 || octet > 255)) {
@@ -233,8 +233,15 @@ function isInvalidIp(ip: string): boolean {
     if (lower === '::' || lower === '0:0:0:0:0:0:0:0') return true;
 
     // Link-local: fe80::/10
-    if (lower.startsWith('fe80:') || lower.startsWith('fe8') || lower.startsWith('fe9'))
+    // The /10 prefix means addresses from fe80:: to febf::
+    if (
+      lower.startsWith('fe8') ||
+      lower.startsWith('fe9') ||
+      lower.startsWith('fea') ||
+      lower.startsWith('feb')
+    ) {
       return true;
+    }
 
     // Unique local addresses (private): fc00::/7
     if (lower.startsWith('fc') || lower.startsWith('fd')) return true;
@@ -258,7 +265,6 @@ export async function isValidGitHubIp(ip: string): Promise<boolean> {
 
     // Reject invalid/restricted IP addresses
     if (isInvalidIp(normalizedIp)) {
-      console.log(`🚫 Rejected invalid/restricted IP address: ${normalizedIp}`);
       return false;
     }
 
