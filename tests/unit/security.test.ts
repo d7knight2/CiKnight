@@ -263,6 +263,133 @@ describe('Security Functions', () => {
       const result = await isValidGitHubIp('192.30.252.1');
       expect(result).toBe(true);
     });
+
+    describe('Invalid IP Address Rejection', () => {
+      it('should reject link-local IPv4 addresses (169.254.x.x)', async () => {
+        const result = await isValidGitHubIp('169.254.169.126');
+        expect(result).toBe(false);
+      });
+
+      it('should reject link-local IPv4 addresses at range start', async () => {
+        const result = await isValidGitHubIp('169.254.0.0');
+        expect(result).toBe(false);
+      });
+
+      it('should reject link-local IPv4 addresses at range end', async () => {
+        const result = await isValidGitHubIp('169.254.255.255');
+        expect(result).toBe(false);
+      });
+
+      it('should reject loopback IPv4 addresses (127.0.0.0/8)', async () => {
+        const result = await isValidGitHubIp('127.0.0.1');
+        expect(result).toBe(false);
+      });
+
+      it('should reject loopback IPv4 addresses in full range', async () => {
+        const result = await isValidGitHubIp('127.1.2.3');
+        expect(result).toBe(false);
+      });
+
+      it('should reject private IPv4 addresses (10.0.0.0/8)', async () => {
+        const result = await isValidGitHubIp('10.0.0.1');
+        expect(result).toBe(false);
+      });
+
+      it('should reject private IPv4 addresses (172.16.0.0/12)', async () => {
+        const result = await isValidGitHubIp('172.16.0.1');
+        expect(result).toBe(false);
+      });
+
+      it('should reject private IPv4 addresses in 172.16-31 range', async () => {
+        const result = await isValidGitHubIp('172.31.255.255');
+        expect(result).toBe(false);
+      });
+
+      it('should reject private IPv4 addresses (192.168.0.0/16)', async () => {
+        const result = await isValidGitHubIp('192.168.1.1');
+        expect(result).toBe(false);
+      });
+
+      it('should reject unspecified IPv4 address (0.0.0.0)', async () => {
+        const result = await isValidGitHubIp('0.0.0.0');
+        expect(result).toBe(false);
+      });
+
+      it('should reject broadcast IPv4 address (255.255.255.255)', async () => {
+        const result = await isValidGitHubIp('255.255.255.255');
+        expect(result).toBe(false);
+      });
+
+      it('should reject multicast IPv4 addresses (224.0.0.0/4)', async () => {
+        const result = await isValidGitHubIp('224.0.0.1');
+        expect(result).toBe(false);
+      });
+
+      it('should reject multicast IPv4 addresses at range end', async () => {
+        const result = await isValidGitHubIp('239.255.255.255');
+        expect(result).toBe(false);
+      });
+
+      it('should reject loopback IPv6 address (::1)', async () => {
+        const result = await isValidGitHubIp('::1');
+        expect(result).toBe(false);
+      });
+
+      it('should reject loopback IPv6 address (full notation)', async () => {
+        const result = await isValidGitHubIp('0:0:0:0:0:0:0:1');
+        expect(result).toBe(false);
+      });
+
+      it('should reject unspecified IPv6 address (::)', async () => {
+        const result = await isValidGitHubIp('::');
+        expect(result).toBe(false);
+      });
+
+      it('should reject link-local IPv6 addresses (fe80::/10)', async () => {
+        const result = await isValidGitHubIp('fe80::1');
+        expect(result).toBe(false);
+      });
+
+      it('should reject unique local IPv6 addresses (fc00::/7)', async () => {
+        const result = await isValidGitHubIp('fc00::1');
+        expect(result).toBe(false);
+      });
+
+      it('should reject unique local IPv6 addresses (fd00::/8)', async () => {
+        const result = await isValidGitHubIp('fd00::1');
+        expect(result).toBe(false);
+      });
+
+      it('should reject multicast IPv6 addresses (ff00::/8)', async () => {
+        const result = await isValidGitHubIp('ff00::1');
+        expect(result).toBe(false);
+      });
+
+      it('should reject IPv6-mapped IPv4 loopback addresses', async () => {
+        const result = await isValidGitHubIp('::ffff:127.0.0.1');
+        expect(result).toBe(false);
+      });
+
+      it('should reject IPv6-mapped IPv4 link-local addresses', async () => {
+        const result = await isValidGitHubIp('::ffff:169.254.169.126');
+        expect(result).toBe(false);
+      });
+
+      it('should reject IPv6-mapped IPv4 private addresses', async () => {
+        const result = await isValidGitHubIp('::ffff:192.168.1.1');
+        expect(result).toBe(false);
+      });
+
+      it('should reject malformed IPv4 addresses with invalid octets', async () => {
+        const result = await isValidGitHubIp('999.999.999.999');
+        expect(result).toBe(false);
+      });
+
+      it('should reject malformed IPv4 addresses with too few octets', async () => {
+        const result = await isValidGitHubIp('192.168.1');
+        expect(result).toBe(false);
+      });
+    });
   });
 
   describe('getClientIp', () => {

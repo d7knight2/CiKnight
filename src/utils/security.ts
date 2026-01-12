@@ -187,6 +187,66 @@ function isIpInCidr(ip: string, cidr: string): boolean {
 }
 
 /**
+ * Checks if an IP address is invalid/restricted (private, loopback, link-local, etc.)
+ * Returns true if the IP should be rejected
+ */
+function isInvalidIp(ip: string): boolean {
+  // Handle IPv4
+  if (ip.includes('.') && !ip.includes(':')) {
+    const octets = ip.split('.').map((octet) => parseInt(octet, 10));
+    if (octets.length !== 4 || octets.some((octet) => isNaN(octet) || octet < 0 || octet > 255)) {
+      return true; // Malformed IPv4
+    }
+
+    // Loopback: 127.0.0.0/8
+    if (octets[0] === 127) return true;
+
+    // Link-local: 169.254.0.0/16
+    if (octets[0] === 169 && octets[1] === 254) return true;
+
+    // Private ranges
+    // 10.0.0.0/8
+    if (octets[0] === 10) return true;
+    // 172.16.0.0/12
+    if (octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31) return true;
+    // 192.168.0.0/16
+    if (octets[0] === 192 && octets[1] === 168) return true;
+
+    // Unspecified: 0.0.0.0
+    if (octets.every((octet) => octet === 0)) return true;
+
+    // Broadcast: 255.255.255.255
+    if (octets.every((octet) => octet === 255)) return true;
+
+    // Multicast: 224.0.0.0/4
+    if (octets[0] >= 224 && octets[0] <= 239) return true;
+  }
+
+  // Handle IPv6
+  if (ip.includes(':')) {
+    const lower = ip.toLowerCase();
+
+    // Loopback: ::1
+    if (lower === '::1' || lower === '0:0:0:0:0:0:0:1') return true;
+
+    // Unspecified: ::
+    if (lower === '::' || lower === '0:0:0:0:0:0:0:0') return true;
+
+    // Link-local: fe80::/10
+    if (lower.startsWith('fe80:') || lower.startsWith('fe8') || lower.startsWith('fe9'))
+      return true;
+
+    // Unique local addresses (private): fc00::/7
+    if (lower.startsWith('fc') || lower.startsWith('fd')) return true;
+
+    // Multicast: ff00::/8
+    if (lower.startsWith('ff')) return true;
+  }
+
+  return false;
+}
+
+/**
  * Validates if the request IP is from GitHub's webhook IP ranges
  */
 export async function isValidGitHubIp(ip: string): Promise<boolean> {
@@ -195,6 +255,12 @@ export async function isValidGitHubIp(ip: string): Promise<boolean> {
   try {
     // Normalize IPv6-mapped IPv4 addresses to their IPv4 equivalents
     const normalizedIp = normalizeIpv6MappedIpv4(ip);
+
+    // Reject invalid/restricted IP addresses
+    if (isInvalidIp(normalizedIp)) {
+      console.log(`🚫 Rejected invalid/restricted IP address: ${normalizedIp}`);
+      return false;
+    }
 
     const ipRanges = await fetchGitHubIpRanges();
 
