@@ -103,15 +103,15 @@ testPathIgnorePatterns: [
 
 ### Running Individual Failures
 
-To run only the ANR Watchdog test failures explicitly:
+To run only the ANR Watchdog test failures explicitly, use Jest directly with a custom configuration that doesn't ignore the test:
 
 ```bash
-npm test -- anr-watchdog.test.ts
+npx jest tests/unit/anr-watchdog.test.ts --testPathIgnorePatterns=/node_modules/ --testPathIgnorePatterns=/tests/integration/
 ```
 
-Or run with the full path:
+Or create a temporary Jest configuration and run:
 ```bash
-npm test -- tests/unit/anr-watchdog.test.ts
+npx jest --config='{"preset": "ts-jest", "testEnvironment": "node", "testMatch": ["**/anr-watchdog.test.ts"]}' tests/unit/anr-watchdog.test.ts
 ```
 
 ### Triggering CI Failures
