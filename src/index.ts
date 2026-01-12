@@ -55,6 +55,35 @@ app.get('/health', (_req, res) => {
   res.status(200).json({ status: 'healthy' });
 });
 
+// Healthz endpoint with webhook secret validation
+app.get('/healthz', (_req, res) => {
+  const webhookSecret = process.env.GITHUB_WEBHOOK_SECRET;
+  const appId = process.env.GITHUB_APP_ID;
+  const privateKey = process.env.GITHUB_PRIVATE_KEY;
+
+  const checks = {
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    checks: {
+      webhookSecret: !!webhookSecret,
+      appId: !!appId,
+      privateKey: !!privateKey,
+    },
+  };
+
+  // Return 503 if critical configuration is missing
+  if (!webhookSecret || !appId || !privateKey) {
+    res.status(503).json({
+      ...checks,
+      status: 'unhealthy',
+      message: 'Missing required configuration',
+    });
+    return;
+  }
+
+  res.status(200).json(checks);
+});
+
 // GitHub webhook endpoint with rate limiting and IP restriction
 app.post('/webhook', webhookLimiter, ipRestrictionMiddleware, webhookHandler);
 
@@ -63,8 +92,12 @@ app.listen(PORT, () => {
   console.log(`🚀 CiKnight is running on port ${PORT}`);
   console.log(`📡 Webhook endpoint: http://localhost:${PORT}/webhook`);
   console.log(`💚 Health check endpoint: http://localhost:${PORT}/health`);
+  console.log(`🏥 Healthz endpoint: http://localhost:${PORT}/healthz`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🔒 IP Restriction: DISABLED (all IPs accepted)`);
+  console.log(
+    `🔍 Webhook Debug Mode: ${process.env.WEBHOOK_DEBUG === 'true' ? 'ENABLED' : 'DISABLED'}`
+  );
 });
 
 // Graceful shutdown

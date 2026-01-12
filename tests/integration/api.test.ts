@@ -27,6 +27,22 @@ test.describe('CiKnight API', () => {
     expect(data).toHaveProperty('status', 'healthy');
   });
 
+  test('should respond to healthz endpoint with configuration checks', async ({ request }) => {
+    const response = await request.get('/healthz');
+
+    expect(response.ok()).toBeTruthy();
+    expect(response.status()).toBe(200);
+
+    const data = await response.json();
+
+    expect(data).toHaveProperty('status');
+    expect(data).toHaveProperty('timestamp');
+    expect(data).toHaveProperty('checks');
+    expect(data.checks).toHaveProperty('webhookSecret');
+    expect(data.checks).toHaveProperty('appId');
+    expect(data.checks).toHaveProperty('privateKey');
+  });
+
   test('should reject webhook requests without required headers', async ({ request }) => {
     const response = await request.post('/webhook', {
       data: { test: 'data' },
