@@ -119,3 +119,45 @@ jobs:
           tags: ciknight:test
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # Failure Scenario: ANR Watchdog Simulation
+  # This job simulates various CI failure scenarios to test error handling
+  anr-watchdog-test:
+    name: ANR Watchdog - Failure Simulation
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: read
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      # Failure 1: Wrong Node.js version (intentional misconfiguration)
+      - name: Setup Node.js with Wrong Version
+        uses: actions/setup-node@v4
+        with:
+          node-version: '14.0.0'  # Intentionally old version that may cause issues
+          cache: 'npm'
+      
+      # Failure 2: Install dependencies with incompatible Node version
+      - name: Install dependencies
+        run: npm ci
+        continue-on-error: true
+      
+      # Failure 3: Run non-existent test command
+      - name: Run Non-existent Test Command
+        run: npm run test:anr-watchdog
+        continue-on-error: false
+      
+      # Failure 4: Execute failing test script
+      - name: Execute Failing Test Script
+        run: |
+          echo "Simulating ANR (Application Not Responding) scenario..."
+          echo "ERROR: Watchdog timeout detected!"
+          exit 1
+        continue-on-error: false
+      
+      # This step should never be reached due to previous failures
+      - name: Success Message
+        run: echo "All ANR Watchdog tests passed!"
