@@ -587,11 +587,14 @@ When a webhook is received, the application logs detailed debug information to h
 ```
 🔍 [Webhook Debug] Delivery ID: <delivery-id>, Event: <event-type>
 🔍 [Webhook Debug] Payload length: <bytes> bytes
-🔍 [Webhook Debug] Payload preview: <first-100-chars>...
 🔍 [Webhook Debug] Received signature: sha256=<signature>
-🔍 [Webhook Debug] Webhook secret configured: Yes (length: <length>)
-🔍 [Webhook Debug] Computed signature: sha256=<computed-signature>
+🔍 [Webhook Debug] Webhook secret configured: Yes / No
 🔍 [Webhook Debug] Signatures match: ✅ Yes / ❌ No
+```
+
+If signatures don't match, the computed signature is also logged for comparison:
+```
+🔍 [Webhook Debug] Computed signature: sha256=<computed-signature>
 ```
 
 If signature verification fails, additional diagnostic information is logged:

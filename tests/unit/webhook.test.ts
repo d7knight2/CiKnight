@@ -474,16 +474,10 @@ describe('Webhook Handler', () => {
         expect.stringContaining('🔍 [Webhook Debug] Payload length:')
       );
       expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining('🔍 [Webhook Debug] Payload preview:')
-      );
-      expect(consoleLogSpy).toHaveBeenCalledWith(
         expect.stringContaining('🔍 [Webhook Debug] Received signature: sha256=test-signature')
       );
       expect(consoleLogSpy).toHaveBeenCalledWith(
         expect.stringContaining('🔍 [Webhook Debug] Webhook secret configured: Yes')
-      );
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining('🔍 [Webhook Debug] Computed signature:')
       );
       expect(consoleLogSpy).toHaveBeenCalledWith(
         expect.stringContaining('🔍 [Webhook Debug] Signatures match:')
@@ -583,28 +577,28 @@ describe('Webhook Handler', () => {
       expect(consoleLogSpy).toHaveBeenCalledWith(
         `🔍 [Webhook Debug] Payload length: ${payloadStr.length} bytes`
       );
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining('🔍 [Webhook Debug] Payload preview:')
-      );
     });
 
-    test('should truncate long payload previews', async () => {
-      const longPayload = JSON.stringify({ data: 'x'.repeat(200) });
+    test('should log computed signature only when signatures do not match', async () => {
+      const payload = {
+        test: 'data',
+      };
 
       mockRequest.headers = {
         ...mockRequest.headers,
         'x-github-event': 'push',
       };
-      (mockRequest as any).rawBody = longPayload;
+      (mockRequest as any).rawBody = JSON.stringify(payload);
 
       await webhookHandler(mockRequest as Request, mockResponse as Response);
 
-      // Check that preview was logged with truncation indicator
-      const previewLog = consoleLogSpy.mock.calls.find((call) =>
-        call[0]?.includes('🔍 [Webhook Debug] Payload preview:')
+      // Since this is a mismatch (test signature doesn't match computed), should log computed signature
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('🔍 [Webhook Debug] Signatures match: ❌ No')
       );
-      expect(previewLog).toBeDefined();
-      expect(previewLog![0]).toContain('...');
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('🔍 [Webhook Debug] Computed signature:')
+      );
     });
 
     test('should log webhook secret configuration status', async () => {
@@ -623,7 +617,34 @@ describe('Webhook Handler', () => {
       await webhookHandler(mockRequest as Request, mockResponse as Response);
 
       expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining('🔍 [Webhook Debug] Webhook secret configured: Yes (length:')
+        expect.stringContaining('🔍 [Webhook Debug] Webhook secret configured: Yes')
+      );
+    });
+
+    test('should only log computed signature when there is a mismatch', async () => {
+      const payload = {
+        pull_request: {
+          number: 123,
+        },
+        repository: {
+          owner: {
+            login: 'd7knight2',
+          },
+          name: 'TestRepo',
+        },
+      };
+
+      (mockRequest as any).rawBody = JSON.stringify(payload);
+
+      await webhookHandler(mockRequest as Request, mockResponse as Response);
+
+      // Should log that signatures don't match
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('🔍 [Webhook Debug] Signatures match: ❌ No')
+      );
+      // Should log the computed signature for comparison
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('🔍 [Webhook Debug] Computed signature:')
       );
     });
   });

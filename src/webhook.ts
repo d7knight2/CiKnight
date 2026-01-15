@@ -111,21 +111,19 @@ export const webhookHandler = async (req: Request, res: Response): Promise<void>
 
     // Debug logging for signature validation
     console.log(`🔍 [Webhook Debug] Payload length: ${rawBody.length} bytes`);
-    console.log(
-      `🔍 [Webhook Debug] Payload preview: ${rawBody.substring(0, 100)}${rawBody.length > 100 ? '...' : ''}`
-    );
     console.log(`🔍 [Webhook Debug] Received signature: ${signature}`);
-    console.log(
-      `🔍 [Webhook Debug] Webhook secret configured: ${webhookSecret ? 'Yes (length: ' + webhookSecret.length + ')' : 'No'}`
-    );
+    console.log(`🔍 [Webhook Debug] Webhook secret configured: ${webhookSecret ? 'Yes' : 'No'}`);
 
     // Compute expected signature for debugging
     if (webhookSecret) {
       const computedSignature = computeWebhookSignature(webhookSecret, rawBody);
-      console.log(`🔍 [Webhook Debug] Computed signature: ${computedSignature}`);
-      console.log(
-        `🔍 [Webhook Debug] Signatures match: ${signature === computedSignature ? '✅ Yes' : '❌ No'}`
-      );
+      const signaturesMatch = signature === computedSignature;
+      console.log(`🔍 [Webhook Debug] Signatures match: ${signaturesMatch ? '✅ Yes' : '❌ No'}`);
+
+      // Only log computed signature if there's a mismatch (for debugging)
+      if (!signaturesMatch) {
+        console.log(`🔍 [Webhook Debug] Computed signature: ${computedSignature}`);
+      }
     }
 
     // Owner verification for pull_request events (before signature verification for efficiency)
