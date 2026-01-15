@@ -78,41 +78,60 @@ webhooks.onError((error) => {
 });
 
 // Webhook handler for Express
-export const webhookHandler = async (req: Request, res: Response): Promise<Response> => {
+export const webhookHandler = async (req: Request, res: Response): Promise<void> => {
+  let responded = false;
+
   try {
     const signature = req.headers['x-hub-signature-256'] as string;
     const event = req.headers['x-github-event'] as string;
     const id = req.headers['x-github-delivery'] as string;
 
     if (!signature || !event || !id) {
-      return res.status(400).json({ error: 'Missing required webhook headers' });
+      responded = true;
+      res.status(400).json({ error: 'Missing required webhook headers' });
+      return;
     }
 
     // Use rawBody for signature verification, req.body is already parsed JSON
     const rawBody = (req as any).rawBody;
     if (!rawBody) {
-      return res.status(400).json({ error: 'Missing raw body for verification' });
+      responded = true;
+      res.status(400).json({ error: 'Missing raw body for verification' });
+      return;
     }
 
     // Owner verification for pull_request events (before signature verification for efficiency)
     // Note: This check happens before signature verification to quickly reject unauthorized
     // webhooks and reduce processing overhead. GitHub's signature is still verified after this check.
     if (event.startsWith('pull_request')) {
-      const payload = JSON.parse(rawBody);
+      let payload;
+      try {
+        payload = JSON.parse(rawBody);
+      } catch (parseError) {
+        console.error('❌ Error parsing webhook payload:', parseError);
+        responded = true;
+        res.status(400).json({ error: 'Invalid JSON payload' });
+        return;
+      }
+
       const repoOwner = payload.repository?.owner?.login;
 
       if (!repoOwner) {
         console.warn('⚠️  Missing repository owner in payload');
-        return res.status(400).json({ error: 'Missing repository owner information' });
+        responded = true;
+        res.status(400).json({ error: 'Missing repository owner information' });
+        return;
       }
 
       if (repoOwner !== 'd7knight2') {
         console.warn(`🚫 Unauthorized webhook: Repository owner '${repoOwner}' is not 'd7knight2'`);
-        return res.status(403).json({
+        responded = true;
+        res.status(403).json({
           error: 'Forbidden',
           message:
             'This GitHub App only processes pull requests for repositories owned by d7knight2',
         });
+        return;
       }
     }
 
@@ -124,10 +143,13 @@ export const webhookHandler = async (req: Request, res: Response): Promise<Respo
     });
 
     console.log(`✅ Webhook verified and processed successfully: ${event} (${id})`);
-    return res.status(200).json({ message: 'Webhook received' });
+    responded = true;
+    res.status(200).json({ message: 'Webhook received' });
   } catch (error: any) {
     console.error('❌ Error processing webhook:', error);
-    return res.status(500).json({ error: 'Internal server error', message: error.message });
+    if (!responded) {
+      res.status(500).json({ error: 'Internal server error', message: error.message });
+    }
   }
 };
 

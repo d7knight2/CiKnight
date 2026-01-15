@@ -3,13 +3,16 @@ import { Request, Response } from 'express';
 // Set environment variable before importing webhook
 process.env.GITHUB_WEBHOOK_SECRET = 'test-webhook-secret';
 
+// Create mock verifyAndReceive function
+const mockVerifyAndReceive = jest.fn().mockResolvedValue(undefined);
+
 // Mock the webhooks verifyAndReceive
 jest.mock('@octokit/webhooks', () => {
   return {
     Webhooks: jest.fn().mockImplementation(() => ({
       on: jest.fn(),
       onError: jest.fn(),
-      verifyAndReceive: jest.fn().mockResolvedValue(undefined),
+      verifyAndReceive: mockVerifyAndReceive,
     })),
   };
 });
@@ -261,6 +264,187 @@ describe('Webhook Handler', () => {
 
       expect(statusMock).toHaveBeenCalledWith(400);
       expect(jsonMock).toHaveBeenCalledWith({ error: 'Missing raw body for verification' });
+    });
+  });
+
+  describe('Invalid Payload Handling', () => {
+    test('should return 400 for invalid JSON in pull_request payload', async () => {
+      (mockRequest as any).rawBody = 'invalid json {not valid';
+
+      await webhookHandler(mockRequest as Request, mockResponse as Response);
+
+      expect(statusMock).toHaveBeenCalledWith(400);
+      expect(jsonMock).toHaveBeenCalledWith({ error: 'Invalid JSON payload' });
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('❌ Error parsing webhook payload:'),
+        expect.any(Error)
+      );
+    });
+
+    test('should return 400 for malformed JSON in pull_request payload', async () => {
+      (mockRequest as any).rawBody = '{"incomplete": true';
+
+      await webhookHandler(mockRequest as Request, mockResponse as Response);
+
+      expect(statusMock).toHaveBeenCalledWith(400);
+      expect(jsonMock).toHaveBeenCalledWith({ error: 'Invalid JSON payload' });
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('❌ Error parsing webhook payload:'),
+        expect.any(Error)
+      );
+    });
+
+    test('should handle valid JSON but missing required fields', async () => {
+      const payload = {
+        pull_request: {
+          number: 123,
+        },
+        // Missing repository field
+      };
+
+      (mockRequest as any).rawBody = JSON.stringify(payload);
+
+      await webhookHandler(mockRequest as Request, mockResponse as Response);
+
+      expect(statusMock).toHaveBeenCalledWith(400);
+      expect(jsonMock).toHaveBeenCalledWith({ error: 'Missing repository owner information' });
+    });
+  });
+
+  describe('Error Resilience', () => {
+    test('should handle errors in verifyAndReceive gracefully', async () => {
+      mockVerifyAndReceive.mockRejectedValueOnce(new Error('Signature verification failed'));
+
+      const payload = {
+        pull_request: {
+          number: 123,
+        },
+        repository: {
+          owner: {
+            login: 'd7knight2',
+          },
+          name: 'TestRepo',
+        },
+      };
+
+      (mockRequest as any).rawBody = JSON.stringify(payload);
+
+      await webhookHandler(mockRequest as Request, mockResponse as Response);
+
+      expect(statusMock).toHaveBeenCalledWith(500);
+      expect(jsonMock).toHaveBeenCalledWith({
+        error: 'Internal server error',
+        message: 'Signature verification failed',
+      });
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('❌ Error processing webhook:'),
+        expect.any(Error)
+      );
+
+      // Reset mock for other tests
+      mockVerifyAndReceive.mockResolvedValue(undefined);
+    });
+
+    test('should handle async errors without double-sending response', async () => {
+      mockVerifyAndReceive.mockRejectedValueOnce(new Error('Async processing error'));
+
+      const payload = {
+        push: {
+          ref: 'refs/heads/main',
+        },
+        repository: {
+          owner: {
+            login: 'some-user',
+          },
+          name: 'SomeRepo',
+        },
+      };
+
+      mockRequest.headers = {
+        ...mockRequest.headers,
+        'x-github-event': 'push',
+      };
+
+      (mockRequest as any).rawBody = JSON.stringify(payload);
+
+      await webhookHandler(mockRequest as Request, mockResponse as Response);
+
+      // Should only send response once
+      expect(statusMock).toHaveBeenCalledTimes(1);
+      expect(jsonMock).toHaveBeenCalledTimes(1);
+      expect(statusMock).toHaveBeenCalledWith(500);
+
+      // Reset mock for other tests
+      mockVerifyAndReceive.mockResolvedValue(undefined);
+    });
+
+    test('should handle unhandled promise rejections in webhook processing', async () => {
+      // Simulate an unhandled rejection
+      mockVerifyAndReceive.mockRejectedValueOnce(
+        Object.assign(new Error('Unhandled rejection'), { unhandledRejection: true })
+      );
+
+      const payload = {
+        check_run: {
+          name: 'Test Check',
+          conclusion: 'success',
+        },
+        repository: {
+          owner: {
+            login: 'test-owner',
+          },
+          name: 'TestRepo',
+        },
+      };
+
+      mockRequest.headers = {
+        ...mockRequest.headers,
+        'x-github-event': 'check_run',
+      };
+
+      (mockRequest as any).rawBody = JSON.stringify(payload);
+
+      await webhookHandler(mockRequest as Request, mockResponse as Response);
+
+      expect(statusMock).toHaveBeenCalledWith(500);
+      expect(jsonMock).toHaveBeenCalledWith({
+        error: 'Internal server error',
+        message: 'Unhandled rejection',
+      });
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('❌ Error processing webhook:'),
+        expect.objectContaining({ message: 'Unhandled rejection' })
+      );
+
+      // Reset mock for other tests
+      mockVerifyAndReceive.mockResolvedValue(undefined);
+    });
+
+    test('should not send response twice if error occurs after response sent', async () => {
+      // This test ensures the response tracking prevents double-send
+      const payload = {
+        pull_request: {
+          number: 123,
+        },
+        repository: {
+          owner: {
+            login: 'd7knight2',
+          },
+        },
+      };
+
+      (mockRequest as any).rawBody = JSON.stringify(payload);
+
+      // Mock verifyAndReceive to succeed
+      mockVerifyAndReceive.mockResolvedValueOnce(undefined);
+
+      await webhookHandler(mockRequest as Request, mockResponse as Response);
+
+      // Verify response sent exactly once
+      expect(statusMock).toHaveBeenCalledTimes(1);
+      expect(jsonMock).toHaveBeenCalledTimes(1);
+      expect(statusMock).toHaveBeenCalledWith(200);
+      expect(jsonMock).toHaveBeenCalledWith({ message: 'Webhook received' });
     });
   });
 });
