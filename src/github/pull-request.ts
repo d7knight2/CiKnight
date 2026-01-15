@@ -1,20 +1,60 @@
 import { createGitHubClient, getRepoInfo } from './client';
 
 export async function handlePullRequest(payload: any, action: string) {
+  const timestamp = new Date().toISOString();
+
   try {
     const { owner, repo, installationId } = getRepoInfo(payload);
+    console.log(`🔑 Authentication: Creating GitHub client for installation ${installationId}`);
+
     const octokit = createGitHubClient(installationId);
     const prNumber = payload.pull_request.number;
 
     console.log(`🔍 Processing PR #${prNumber} in ${owner}/${repo} (action: ${action})`);
 
+    // Post test comment to verify webhook is working
+    console.log(`🧪 Posting test comment on PR #${prNumber} to verify webhook functionality`);
+    try {
+      const testCommentResponse = await octokit.issues.createComment({
+        owner,
+        repo,
+        issue_number: prNumber,
+        body: `✅ **CiKnight Webhook Test Comment**\n\n🕐 Timestamp: \`${timestamp}\`\n📬 Event: \`pull_request.${action}\`\n🆔 PR: #${prNumber}\n📦 Repository: \`${owner}/${repo}\`\n\n_This comment confirms the webhook is triggering successfully._`,
+      });
+      console.log(`✅ Test comment posted successfully`);
+      console.log(`   - Comment ID: ${testCommentResponse.data.id}`);
+      console.log(`   - Comment URL: ${testCommentResponse.data.html_url}`);
+      console.log(`   - HTTP Status: ${testCommentResponse.status}`);
+    } catch (commentError: any) {
+      console.error(`❌ Failed to post test comment on PR #${prNumber}`);
+      console.error(`   - Error Type: ${commentError.name || 'Unknown'}`);
+      console.error(`   - Error Message: ${commentError.message}`);
+      console.error(`   - HTTP Status: ${commentError.status || 'N/A'}`);
+      console.error(`   - Response: ${JSON.stringify(commentError.response?.data || {})}`);
+      // Continue processing even if test comment fails
+    }
+
     // Check if PR is mergeable
     console.log(`🔍 Fetching PR details for #${prNumber}`);
-    const { data: pr } = await octokit.pulls.get({
-      owner,
-      repo,
-      pull_number: prNumber,
-    });
+    let pr;
+    try {
+      const prResponse = await octokit.pulls.get({
+        owner,
+        repo,
+        pull_number: prNumber,
+      });
+      pr = prResponse.data;
+      console.log(`✅ Successfully fetched PR details`);
+      console.log(`   - HTTP Status: ${prResponse.status}`);
+      console.log(
+        `   - Rate Limit Remaining: ${prResponse.headers['x-ratelimit-remaining'] || 'N/A'}`
+      );
+    } catch (prError: any) {
+      console.error(`❌ Failed to fetch PR details for #${prNumber}`);
+      console.error(`   - Error Message: ${prError.message}`);
+      console.error(`   - HTTP Status: ${prError.status || 'N/A'}`);
+      throw prError;
+    }
 
     console.log(`📊 PR #${prNumber} mergeable state: ${pr.mergeable_state}`);
 
@@ -31,16 +71,34 @@ export async function handlePullRequest(payload: any, action: string) {
     // Add a comment to let users know CiKnight is monitoring
     if (action === 'opened') {
       console.log(`💬 Posting welcome comment on PR #${prNumber}`);
-      await octokit.issues.createComment({
-        owner,
-        repo,
-        issue_number: prNumber,
-        body: `🛡️ **CiKnight is now monitoring this PR**\n\nI'll help with:\n- 🔀 Resolving merge conflicts\n- 🔧 Fixing CI failures\n- 📝 Applying patches\n\nStay tuned!`,
-      });
-      console.log(`💬 Posted welcome comment on PR #${prNumber}`);
+      try {
+        const welcomeResponse = await octokit.issues.createComment({
+          owner,
+          repo,
+          issue_number: prNumber,
+          body: `🛡️ **CiKnight is now monitoring this PR**\n\nI'll help with:\n- 🔀 Resolving merge conflicts\n- 🔧 Fixing CI failures\n- 📝 Applying patches\n\nStay tuned!`,
+        });
+        console.log(`💬 Posted welcome comment on PR #${prNumber}`);
+        console.log(`   - HTTP Status: ${welcomeResponse.status}`);
+      } catch (welcomeError: any) {
+        console.error(`❌ Failed to post welcome comment on PR #${prNumber}`);
+        console.error(`   - Error Message: ${welcomeError.message}`);
+        console.error(`   - HTTP Status: ${welcomeError.status || 'N/A'}`);
+        throw welcomeError;
+      }
     }
   } catch (error: any) {
-    console.error(`❌ Error handling pull request:`, error.message, error);
+    console.error(`\n❌ ===== ERROR IN PULL REQUEST HANDLER =====`);
+    console.error(`⏰ Timestamp: ${timestamp}`);
+    console.error(`🔴 Error Type: ${error.name || 'Unknown'}`);
+    console.error(`📝 Error Message: ${error.message}`);
+    console.error(`📊 HTTP Status: ${error.status || 'N/A'}`);
+    if (error.response?.data) {
+      console.error(`📋 API Response: ${JSON.stringify(error.response.data)}`);
+    }
+    console.error(`📚 Stack Trace:`, error.stack);
+    console.error('🏁 ===== END ERROR =====\n');
+    throw error;
   }
 }
 
@@ -48,7 +106,7 @@ async function handleMergeConflicts(octokit: any, owner: string, repo: string, p
   try {
     console.log(`🔀 Processing merge conflicts for PR #${prNumber}`);
     // Comment on the PR about merge conflicts
-    await octokit.issues.createComment({
+    const conflictResponse = await octokit.issues.createComment({
       owner,
       repo,
       issue_number: prNumber,
@@ -56,6 +114,8 @@ async function handleMergeConflicts(octokit: any, owner: string, repo: string, p
     });
 
     console.log(`💬 Posted merge conflict comment on PR #${prNumber}`);
+    console.log(`   - Comment ID: ${conflictResponse.data.id}`);
+    console.log(`   - HTTP Status: ${conflictResponse.status}`);
 
     // TODO: Implement automatic merge conflict resolution
     // This would involve:
@@ -64,6 +124,15 @@ async function handleMergeConflicts(octokit: any, owner: string, repo: string, p
     // 3. Using AI/heuristics to resolve conflicts
     // 4. Creating a new commit with resolved conflicts
   } catch (error: any) {
-    console.error(`❌ Error handling merge conflicts for PR #${prNumber}:`, error.message, error);
+    console.error(`\n❌ ===== ERROR HANDLING MERGE CONFLICTS =====`);
+    console.error(`🔴 PR #${prNumber}`);
+    console.error(`📝 Error Message: ${error.message}`);
+    console.error(`📊 HTTP Status: ${error.status || 'N/A'}`);
+    if (error.response?.data) {
+      console.error(`📋 API Response: ${JSON.stringify(error.response.data)}`);
+    }
+    console.error(`📚 Stack Trace:`, error.stack);
+    console.error('🏁 ===== END ERROR =====\n');
+    throw error;
   }
 }

@@ -263,4 +263,147 @@ describe('Webhook Handler', () => {
       expect(jsonMock).toHaveBeenCalledWith({ error: 'Missing raw body for verification' });
     });
   });
+
+  describe('Enhanced Debug Logging', () => {
+    test('should log detailed webhook information on successful processing', async () => {
+      const payload = {
+        pull_request: {
+          number: 123,
+          state: 'open',
+          user: {
+            login: 'test-user',
+          },
+        },
+        action: 'opened',
+        repository: {
+          owner: {
+            login: 'd7knight2',
+          },
+          name: 'CiKnight',
+          full_name: 'd7knight2/CiKnight',
+        },
+        installation: {
+          id: 12345,
+        },
+      };
+
+      (mockRequest as any).rawBody = JSON.stringify(payload);
+
+      await webhookHandler(mockRequest as Request, mockResponse as Response);
+
+      // Check that detailed webhook information was logged
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('🔔 ===== WEBHOOK RECEIVED =====')
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('📨 Event Type: pull_request')
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('🆔 Delivery ID: test-delivery-id')
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('🔐 Signature Present: YES')
+      );
+
+      // Check payload validation logs
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('📦 Payload Structure Validation:')
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Repository: d7knight2/CiKnight')
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Repository Owner: d7knight2')
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Installation ID: 12345'));
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('PR Number: 123'));
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('PR Action: opened'));
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('PR State: open'));
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('PR Author: test-user'));
+
+      // Check owner verification
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('✅ Owner verification passed: d7knight2')
+      );
+
+      // Check completion log
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('🏁 ===== WEBHOOK PROCESSING COMPLETE =====')
+      );
+    });
+
+    test('should log error details when payload parsing fails', async () => {
+      (mockRequest as any).rawBody = 'invalid json{';
+
+      await webhookHandler(mockRequest as Request, mockResponse as Response);
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('❌ Failed to parse webhook payload')
+      );
+      expect(statusMock).toHaveBeenCalledWith(400);
+      expect(jsonMock).toHaveBeenCalledWith({ error: 'Invalid JSON payload' });
+    });
+
+    test('should log detailed error information when webhook processing fails', async () => {
+      const payload = {
+        pull_request: {
+          number: 999,
+        },
+        repository: {
+          owner: {
+            login: 'd7knight2',
+          },
+          name: 'TestRepo',
+        },
+        installation: {
+          id: 99999,
+        },
+      };
+
+      (mockRequest as any).rawBody = JSON.stringify(payload);
+
+      // Import webhooks to access the mock
+      const { webhooks } = require('../../src/webhook');
+      // Mock verifyAndReceive to throw an error
+      webhooks.verifyAndReceive = jest
+        .fn()
+        .mockRejectedValueOnce(new Error('Signature verification failed'));
+
+      await webhookHandler(mockRequest as Request, mockResponse as Response);
+
+      // Check that detailed error information was logged
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('❌ ===== WEBHOOK ERROR =====')
+      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('⏰ Timestamp:'));
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('📝 Error Message: Signature verification failed')
+      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('🏁 ===== END WEBHOOK ERROR =====')
+      );
+
+      expect(statusMock).toHaveBeenCalledWith(500);
+    });
+
+    test('should log missing header details when headers are not present', async () => {
+      mockRequest.headers = {};
+
+      await webhookHandler(mockRequest as Request, mockResponse as Response);
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('🔔 ===== WEBHOOK RECEIVED =====')
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('📨 Event Type: MISSING'));
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('🆔 Delivery ID: MISSING')
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('🔐 Signature Present: NO')
+      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('❌ Missing required webhook headers')
+      );
+    });
+  });
 });

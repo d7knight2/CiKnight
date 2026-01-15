@@ -19,7 +19,10 @@ describe('Pull Request Handler', () => {
         get: jest.fn(),
       },
       issues: {
-        createComment: jest.fn().mockResolvedValue({}),
+        createComment: jest.fn().mockResolvedValue({
+          data: { id: 12345, html_url: 'https://github.com/test/comment' },
+          status: 201,
+        }),
       },
     };
 
@@ -49,6 +52,8 @@ describe('Pull Request Handler', () => {
           number: 42,
           mergeable_state: 'clean',
         },
+        status: 200,
+        headers: { 'x-ratelimit-remaining': '5000' },
       });
 
       const payload = {
@@ -84,6 +89,8 @@ describe('Pull Request Handler', () => {
           number: 43,
           mergeable_state: 'dirty',
         },
+        status: 200,
+        headers: { 'x-ratelimit-remaining': '5000' },
       });
 
       const payload = {
@@ -124,6 +131,8 @@ describe('Pull Request Handler', () => {
           number: 44,
           mergeable_state: 'unstable',
         },
+        status: 200,
+        headers: { 'x-ratelimit-remaining': '5000' },
       });
 
       const payload = {
@@ -151,6 +160,8 @@ describe('Pull Request Handler', () => {
           number: 45,
           mergeable_state: 'clean',
         },
+        status: 200,
+        headers: { 'x-ratelimit-remaining': '5000' },
       });
 
       const payload = {
@@ -188,6 +199,8 @@ describe('Pull Request Handler', () => {
           number: 46,
           mergeable_state: 'clean',
         },
+        status: 200,
+        headers: { 'x-ratelimit-remaining': '5000' },
       });
 
       const payload = {
@@ -204,7 +217,18 @@ describe('Pull Request Handler', () => {
       expect(consoleLogSpy).not.toHaveBeenCalledWith(
         expect.stringContaining('💬 Posting welcome comment')
       );
-      expect(mockOctokit.issues.createComment).not.toHaveBeenCalled();
+      // Test comment should be posted
+      expect(mockOctokit.issues.createComment).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: expect.stringContaining('CiKnight Webhook Test Comment'),
+        })
+      );
+      // But welcome comment should not be posted
+      expect(mockOctokit.issues.createComment).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: expect.stringContaining('CiKnight is now monitoring'),
+        })
+      );
     });
 
     test('should not post welcome comment when PR is reopened', async () => {
@@ -213,6 +237,8 @@ describe('Pull Request Handler', () => {
           number: 47,
           mergeable_state: 'clean',
         },
+        status: 200,
+        headers: { 'x-ratelimit-remaining': '5000' },
       });
 
       const payload = {
@@ -229,7 +255,18 @@ describe('Pull Request Handler', () => {
       expect(consoleLogSpy).not.toHaveBeenCalledWith(
         expect.stringContaining('💬 Posting welcome comment')
       );
-      expect(mockOctokit.issues.createComment).not.toHaveBeenCalled();
+      // Test comment should be posted
+      expect(mockOctokit.issues.createComment).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: expect.stringContaining('CiKnight Webhook Test Comment'),
+        })
+      );
+      // But welcome comment should not be posted
+      expect(mockOctokit.issues.createComment).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: expect.stringContaining('CiKnight is now monitoring'),
+        })
+      );
     });
 
     test('should log error when PR fetch fails', async () => {
@@ -244,12 +281,10 @@ describe('Pull Request Handler', () => {
         installation: { id: 12345 },
       };
 
-      await handlePullRequest(payload, 'opened');
+      await expect(handlePullRequest(payload, 'opened')).rejects.toThrow('API Error');
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('❌ Error handling pull request:'),
-        'API Error',
-        expect.any(Error)
+        expect.stringContaining('❌ Failed to fetch PR details for #48')
       );
     });
 
@@ -259,8 +294,16 @@ describe('Pull Request Handler', () => {
           number: 49,
           mergeable_state: 'dirty',
         },
+        status: 200,
+        headers: { 'x-ratelimit-remaining': '5000' },
       });
-      mockOctokit.issues.createComment.mockRejectedValue(new Error('Comment API Error'));
+      // First call is test comment (succeeds), second call is conflict comment (fails)
+      mockOctokit.issues.createComment
+        .mockResolvedValueOnce({
+          data: { id: 1, html_url: 'https://github.com/test/comment1' },
+          status: 201,
+        })
+        .mockRejectedValueOnce(new Error('Comment API Error'));
 
       const payload = {
         pull_request: { number: 49 },
@@ -271,15 +314,13 @@ describe('Pull Request Handler', () => {
         installation: { id: 12345 },
       };
 
-      await handlePullRequest(payload, 'synchronize');
+      await expect(handlePullRequest(payload, 'synchronize')).rejects.toThrow('Comment API Error');
 
       expect(consoleLogSpy).toHaveBeenCalledWith(
         expect.stringContaining('🔀 Processing merge conflicts for PR #49')
       );
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('❌ Error handling merge conflicts for PR #49:'),
-        'Comment API Error',
-        expect.any(Error)
+        expect.stringContaining('❌ ===== ERROR HANDLING MERGE CONFLICTS =====')
       );
     });
 
@@ -289,8 +330,16 @@ describe('Pull Request Handler', () => {
           number: 50,
           mergeable_state: 'clean',
         },
+        status: 200,
+        headers: { 'x-ratelimit-remaining': '5000' },
       });
-      mockOctokit.issues.createComment.mockRejectedValue(new Error('Comment API Error'));
+      // First call is test comment (succeeds), second call is welcome comment (fails)
+      mockOctokit.issues.createComment
+        .mockResolvedValueOnce({
+          data: { id: 1, html_url: 'https://github.com/test/comment1' },
+          status: 201,
+        })
+        .mockRejectedValueOnce(new Error('Comment API Error'));
 
       const payload = {
         pull_request: { number: 50 },
@@ -301,15 +350,13 @@ describe('Pull Request Handler', () => {
         installation: { id: 12345 },
       };
 
-      await handlePullRequest(payload, 'opened');
+      await expect(handlePullRequest(payload, 'opened')).rejects.toThrow('Comment API Error');
 
       expect(consoleLogSpy).toHaveBeenCalledWith(
         expect.stringContaining('💬 Posting welcome comment on PR #50')
       );
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('❌ Error handling pull request:'),
-        'Comment API Error',
-        expect.any(Error)
+        expect.stringContaining('❌ Failed to post welcome comment on PR #50')
       );
     });
 
@@ -325,6 +372,8 @@ describe('Pull Request Handler', () => {
             number: 100,
             mergeable_state: state,
           },
+          status: 200,
+          headers: { 'x-ratelimit-remaining': '5000' },
         });
 
         const payload = {
@@ -364,6 +413,8 @@ describe('Pull Request Handler', () => {
           number: 200,
           mergeable_state: 'dirty',
         },
+        status: 200,
+        headers: { 'x-ratelimit-remaining': '5000' },
       });
 
       const payload = {
@@ -393,6 +444,130 @@ describe('Pull Request Handler', () => {
       );
       expect(logCalls).toContainEqual(
         expect.stringContaining('💬 Posted welcome comment on PR #200')
+      );
+    });
+
+    test('should post test comment with timestamp on every webhook invocation', async () => {
+      mockOctokit.pulls.get.mockResolvedValue({
+        data: {
+          number: 300,
+          mergeable_state: 'clean',
+        },
+        status: 200,
+        headers: { 'x-ratelimit-remaining': '5000' },
+      });
+
+      const payload = {
+        pull_request: { number: 300 },
+        repository: {
+          owner: { login: 'test-owner' },
+          name: 'test-repo',
+        },
+        installation: { id: 12345 },
+      };
+
+      await handlePullRequest(payload, 'synchronize');
+
+      // Verify test comment was posted
+      expect(mockOctokit.issues.createComment).toHaveBeenCalledWith(
+        expect.objectContaining({
+          owner: 'test-owner',
+          repo: 'test-repo',
+          issue_number: 300,
+          body: expect.stringContaining('CiKnight Webhook Test Comment'),
+        })
+      );
+
+      // Verify the test comment contains required information
+      const testCommentCall = mockOctokit.issues.createComment.mock.calls.find((call: any) =>
+        call[0].body.includes('CiKnight Webhook Test Comment')
+      );
+      expect(testCommentCall).toBeDefined();
+      expect(testCommentCall[0].body).toContain('Timestamp:');
+      expect(testCommentCall[0].body).toContain('Event: `pull_request.synchronize`');
+      expect(testCommentCall[0].body).toContain('PR: #300');
+      expect(testCommentCall[0].body).toContain('Repository: `test-owner/test-repo`');
+    });
+
+    test('should log authentication and API response details', async () => {
+      mockOctokit.pulls.get.mockResolvedValue({
+        data: {
+          number: 400,
+          mergeable_state: 'clean',
+        },
+        status: 200,
+        headers: { 'x-ratelimit-remaining': '5000' },
+      });
+
+      const payload = {
+        pull_request: { number: 400 },
+        repository: {
+          owner: { login: 'test-owner' },
+          name: 'test-repo',
+        },
+        installation: { id: 12345 },
+      };
+
+      await handlePullRequest(payload, 'opened');
+
+      // Check authentication logging
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('🔑 Authentication: Creating GitHub client for installation 12345')
+      );
+
+      // Check API response logging
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('✅ Successfully fetched PR details')
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('HTTP Status: 200'));
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Rate Limit Remaining: 5000')
+      );
+
+      // Check test comment logging
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('✅ Test comment posted successfully')
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Comment ID: 12345'));
+    });
+
+    test('should continue processing even if test comment fails', async () => {
+      mockOctokit.pulls.get.mockResolvedValue({
+        data: {
+          number: 500,
+          mergeable_state: 'clean',
+        },
+        status: 200,
+        headers: { 'x-ratelimit-remaining': '5000' },
+      });
+
+      // Test comment fails, but processing continues
+      mockOctokit.issues.createComment
+        .mockRejectedValueOnce(new Error('Test comment failed'))
+        .mockResolvedValueOnce({
+          data: { id: 2, html_url: 'https://github.com/test/comment2' },
+          status: 201,
+        });
+
+      const payload = {
+        pull_request: { number: 500 },
+        repository: {
+          owner: { login: 'test-owner' },
+          name: 'test-repo',
+        },
+        installation: { id: 12345 },
+      };
+
+      await handlePullRequest(payload, 'opened');
+
+      // Verify test comment failure was logged
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('❌ Failed to post test comment on PR #500')
+      );
+
+      // Verify welcome comment was still posted
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('💬 Posting welcome comment on PR #500')
       );
     });
   });
