@@ -592,10 +592,13 @@ When a webhook is received, the application logs detailed debug information to h
 🔍 [Webhook Debug] Signatures match: ✅ Yes / ❌ No
 ```
 
-If signatures don't match, the computed signature is also logged for comparison:
+If signatures don't match in **non-production environments**, the computed signature is also logged for comparison:
 ```
 🔍 [Webhook Debug] Computed signature: sha256=<computed-signature>
+🔍 [Webhook Debug] Note: Computed signature is only logged in non-production environments
 ```
+
+> **Security Note**: The computed signature is only logged in development/staging (when `NODE_ENV !== 'production'`) to prevent potential information leakage in production logs.
 
 If signature verification fails, additional diagnostic information is logged:
 

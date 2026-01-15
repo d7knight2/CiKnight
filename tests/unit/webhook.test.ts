@@ -1,7 +1,10 @@
 import { Request, Response } from 'express';
 
-// Set environment variable before importing webhook
+// Set environment variables before importing webhook
 process.env.GITHUB_WEBHOOK_SECRET = 'test-webhook-secret';
+// Set NODE_ENV to development for testing
+const originalNodeEnv = process.env.NODE_ENV;
+process.env.NODE_ENV = 'development';
 
 // Create mock verifyAndReceive function
 const mockVerifyAndReceive = jest.fn().mockResolvedValue(undefined);
@@ -647,5 +650,14 @@ describe('Webhook Handler', () => {
         expect.stringContaining('🔍 [Webhook Debug] Computed signature:')
       );
     });
+  });
+
+  afterAll(() => {
+    // Restore original NODE_ENV
+    if (originalNodeEnv !== undefined) {
+      process.env.NODE_ENV = originalNodeEnv;
+    } else {
+      delete process.env.NODE_ENV;
+    }
   });
 });

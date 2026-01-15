@@ -120,9 +120,12 @@ export const webhookHandler = async (req: Request, res: Response): Promise<void>
       const signaturesMatch = signature === computedSignature;
       console.log(`🔍 [Webhook Debug] Signatures match: ${signaturesMatch ? '✅ Yes' : '❌ No'}`);
 
-      // Only log computed signature if there's a mismatch (for debugging)
-      if (!signaturesMatch) {
+      // Only log computed signature in development/staging when there's a mismatch
+      if (!signaturesMatch && process.env.NODE_ENV !== 'production') {
         console.log(`🔍 [Webhook Debug] Computed signature: ${computedSignature}`);
+        console.log(
+          '🔍 [Webhook Debug] Note: Computed signature is only logged in non-production environments'
+        );
       }
     }
 
