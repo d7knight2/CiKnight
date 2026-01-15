@@ -1,5 +1,22 @@
 import { createGitHubClient, getRepoInfo } from './client';
 
+function createTestCommentBody(
+  timestamp: string,
+  action: string,
+  prNumber: number,
+  owner: string,
+  repo: string
+): string {
+  return `✅ **CiKnight Webhook Test Comment**
+
+🕐 Timestamp: \`${timestamp}\`
+📬 Event: \`pull_request.${action}\`
+🆔 PR: #${prNumber}
+📦 Repository: \`${owner}/${repo}\`
+
+_This comment confirms the webhook is triggering successfully._`;
+}
+
 export async function handlePullRequest(payload: any, action: string) {
   const timestamp = new Date().toISOString();
 
@@ -12,26 +29,31 @@ export async function handlePullRequest(payload: any, action: string) {
 
     console.log(`🔍 Processing PR #${prNumber} in ${owner}/${repo} (action: ${action})`);
 
-    // Post test comment to verify webhook is working
-    console.log(`🧪 Posting test comment on PR #${prNumber} to verify webhook functionality`);
-    try {
-      const testCommentResponse = await octokit.issues.createComment({
-        owner,
-        repo,
-        issue_number: prNumber,
-        body: `✅ **CiKnight Webhook Test Comment**\n\n🕐 Timestamp: \`${timestamp}\`\n📬 Event: \`pull_request.${action}\`\n🆔 PR: #${prNumber}\n📦 Repository: \`${owner}/${repo}\`\n\n_This comment confirms the webhook is triggering successfully._`,
-      });
-      console.log(`✅ Test comment posted successfully`);
-      console.log(`   - Comment ID: ${testCommentResponse.data.id}`);
-      console.log(`   - Comment URL: ${testCommentResponse.data.html_url}`);
-      console.log(`   - HTTP Status: ${testCommentResponse.status}`);
-    } catch (commentError: any) {
-      console.error(`❌ Failed to post test comment on PR #${prNumber}`);
-      console.error(`   - Error Type: ${commentError.name || 'Unknown'}`);
-      console.error(`   - Error Message: ${commentError.message}`);
-      console.error(`   - HTTP Status: ${commentError.status || 'N/A'}`);
-      console.error(`   - Response: ${JSON.stringify(commentError.response?.data || {})}`);
-      // Continue processing even if test comment fails
+    // Post test comment to verify webhook is working (if enabled)
+    const enableTestComments = process.env.ENABLE_TEST_COMMENTS === 'true';
+    if (enableTestComments) {
+      console.log(`🧪 Posting test comment on PR #${prNumber} to verify webhook functionality`);
+      try {
+        const testCommentResponse = await octokit.issues.createComment({
+          owner,
+          repo,
+          issue_number: prNumber,
+          body: createTestCommentBody(timestamp, action, prNumber, owner, repo),
+        });
+        console.log(`✅ Test comment posted successfully`);
+        console.log(`   - Comment ID: ${testCommentResponse.data.id}`);
+        console.log(`   - Comment URL: ${testCommentResponse.data.html_url}`);
+        console.log(`   - HTTP Status: ${testCommentResponse.status}`);
+      } catch (commentError: any) {
+        console.error(`❌ Failed to post test comment on PR #${prNumber}`);
+        console.error(`   - Error Type: ${commentError.name || 'Unknown'}`);
+        console.error(`   - Error Message: ${commentError.message}`);
+        console.error(`   - HTTP Status: ${commentError.status || 'N/A'}`);
+        console.error(`   - Response: ${JSON.stringify(commentError.response?.data || {})}`);
+        // Continue processing even if test comment fails
+      }
+    } else {
+      console.log(`ℹ️  Test comments disabled (ENABLE_TEST_COMMENTS not set to 'true')`);
     }
 
     // Check if PR is mergeable

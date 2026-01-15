@@ -13,6 +13,9 @@ describe('Pull Request Handler', () => {
   let consoleErrorSpy: jest.SpyInstance;
 
   beforeEach(() => {
+    // Enable test comments for tests
+    process.env.ENABLE_TEST_COMMENTS = 'true';
+
     // Mock Octokit
     mockOctokit = {
       pulls: {
@@ -40,6 +43,7 @@ describe('Pull Request Handler', () => {
   });
 
   afterEach(() => {
+    delete process.env.ENABLE_TEST_COMMENTS;
     jest.clearAllMocks();
     consoleLogSpy.mockRestore();
     consoleErrorSpy.mockRestore();
@@ -569,6 +573,44 @@ describe('Pull Request Handler', () => {
       expect(consoleLogSpy).toHaveBeenCalledWith(
         expect.stringContaining('💬 Posting welcome comment on PR #500')
       );
+    });
+
+    test('should not post test comment when ENABLE_TEST_COMMENTS is not set', async () => {
+      // Disable test comments
+      delete process.env.ENABLE_TEST_COMMENTS;
+
+      mockOctokit.pulls.get.mockResolvedValue({
+        data: {
+          number: 600,
+          mergeable_state: 'clean',
+        },
+        status: 200,
+        headers: { 'x-ratelimit-remaining': '5000' },
+      });
+
+      const payload = {
+        pull_request: { number: 600 },
+        repository: {
+          owner: { login: 'test-owner' },
+          name: 'test-repo',
+        },
+        installation: { id: 12345 },
+      };
+
+      await handlePullRequest(payload, 'synchronize');
+
+      // Verify test comment was not posted
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          "ℹ️  Test comments disabled (ENABLE_TEST_COMMENTS not set to 'true')"
+        )
+      );
+
+      // Verify no test comment was created
+      const testCommentCall = mockOctokit.issues.createComment.mock.calls.find((call: any) =>
+        call[0].body?.includes('CiKnight Webhook Test Comment')
+      );
+      expect(testCommentCall).toBeUndefined();
     });
   });
 });
