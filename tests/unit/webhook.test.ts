@@ -447,4 +447,184 @@ describe('Webhook Handler', () => {
       expect(jsonMock).toHaveBeenCalledWith({ message: 'Webhook received' });
     });
   });
+
+  describe('Debug Logging', () => {
+    test('should log webhook debug information on successful request', async () => {
+      const payload = {
+        pull_request: {
+          number: 123,
+        },
+        repository: {
+          owner: {
+            login: 'd7knight2',
+          },
+          name: 'CiKnight',
+        },
+      };
+
+      (mockRequest as any).rawBody = JSON.stringify(payload);
+
+      await webhookHandler(mockRequest as Request, mockResponse as Response);
+
+      // Verify debug logs are present
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('🔍 [Webhook Debug] Delivery ID: test-delivery-id')
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('🔍 [Webhook Debug] Payload length:')
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('🔍 [Webhook Debug] Payload preview:')
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('🔍 [Webhook Debug] Received signature: sha256=test-signature')
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('🔍 [Webhook Debug] Webhook secret configured: Yes')
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('🔍 [Webhook Debug] Computed signature:')
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('🔍 [Webhook Debug] Signatures match:')
+      );
+    });
+
+    test('should log signature verification failure details', async () => {
+      mockVerifyAndReceive.mockRejectedValueOnce(
+        new Error('[@octokit/webhooks] signature does not match event payload and secret')
+      );
+
+      const payload = {
+        pull_request: {
+          number: 123,
+        },
+        repository: {
+          owner: {
+            login: 'd7knight2',
+          },
+          name: 'TestRepo',
+        },
+      };
+
+      (mockRequest as any).rawBody = JSON.stringify(payload);
+
+      await webhookHandler(mockRequest as Request, mockResponse as Response);
+
+      expect(statusMock).toHaveBeenCalledWith(500);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('❌ Error processing webhook:'),
+        expect.any(Error)
+      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '🔍 [Webhook Debug] Signature verification failed!'
+      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('🔍 [Webhook Debug] Error details:')
+      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith('🔍 [Webhook Debug] Possible causes:');
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('1. Webhook secret mismatch')
+      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('2. Payload was modified')
+      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('3. Encoding issues'));
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('4. Trailing spaces or newlines')
+      );
+
+      // Reset mock for other tests
+      mockVerifyAndReceive.mockResolvedValue(undefined);
+    });
+
+    test('should log error when headers are missing', async () => {
+      mockRequest.headers = {};
+
+      await webhookHandler(mockRequest as Request, mockResponse as Response);
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '❌ [Webhook Debug] Missing required headers:',
+        expect.objectContaining({
+          hasSignature: false,
+          hasEvent: false,
+          hasId: false,
+        })
+      );
+    });
+
+    test('should log error when rawBody is missing', async () => {
+      (mockRequest as any).rawBody = undefined;
+
+      await webhookHandler(mockRequest as Request, mockResponse as Response);
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '❌ [Webhook Debug] Missing raw body for verification'
+      );
+    });
+
+    test('should log payload length and preview', async () => {
+      const payload = {
+        test: 'data',
+        nested: {
+          value: 123,
+        },
+      };
+      const payloadStr = JSON.stringify(payload);
+
+      mockRequest.headers = {
+        ...mockRequest.headers,
+        'x-github-event': 'push',
+      };
+      (mockRequest as any).rawBody = payloadStr;
+
+      await webhookHandler(mockRequest as Request, mockResponse as Response);
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        `🔍 [Webhook Debug] Payload length: ${payloadStr.length} bytes`
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('🔍 [Webhook Debug] Payload preview:')
+      );
+    });
+
+    test('should truncate long payload previews', async () => {
+      const longPayload = JSON.stringify({ data: 'x'.repeat(200) });
+
+      mockRequest.headers = {
+        ...mockRequest.headers,
+        'x-github-event': 'push',
+      };
+      (mockRequest as any).rawBody = longPayload;
+
+      await webhookHandler(mockRequest as Request, mockResponse as Response);
+
+      // Check that preview was logged with truncation indicator
+      const previewLog = consoleLogSpy.mock.calls.find((call) =>
+        call[0]?.includes('🔍 [Webhook Debug] Payload preview:')
+      );
+      expect(previewLog).toBeDefined();
+      expect(previewLog![0]).toContain('...');
+    });
+
+    test('should log webhook secret configuration status', async () => {
+      const payload = {
+        repository: {
+          owner: { login: 'test' },
+        },
+      };
+
+      mockRequest.headers = {
+        ...mockRequest.headers,
+        'x-github-event': 'push',
+      };
+      (mockRequest as any).rawBody = JSON.stringify(payload);
+
+      await webhookHandler(mockRequest as Request, mockResponse as Response);
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('🔍 [Webhook Debug] Webhook secret configured: Yes (length:')
+      );
+    });
+  });
 });
