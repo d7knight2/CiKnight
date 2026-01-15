@@ -244,12 +244,11 @@ describe('Pull Request Handler', () => {
         installation: { id: 12345 },
       };
 
-      await handlePullRequest(payload, 'opened');
+      await expect(handlePullRequest(payload, 'opened')).rejects.toThrow('API Error');
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         expect.stringContaining('❌ Error handling pull request:'),
-        'API Error',
-        expect.any(Error)
+        'API Error'
       );
     });
 
@@ -271,15 +270,14 @@ describe('Pull Request Handler', () => {
         installation: { id: 12345 },
       };
 
-      await handlePullRequest(payload, 'synchronize');
+      await expect(handlePullRequest(payload, 'synchronize')).rejects.toThrow('Comment API Error');
 
       expect(consoleLogSpy).toHaveBeenCalledWith(
         expect.stringContaining('🔀 Processing merge conflicts for PR #49')
       );
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         expect.stringContaining('❌ Error handling merge conflicts for PR #49:'),
-        'Comment API Error',
-        expect.any(Error)
+        'Comment API Error'
       );
     });
 
@@ -301,15 +299,10 @@ describe('Pull Request Handler', () => {
         installation: { id: 12345 },
       };
 
-      await handlePullRequest(payload, 'opened');
+      await expect(handlePullRequest(payload, 'opened')).rejects.toThrow('Comment API Error');
 
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining('💬 Posting welcome comment on PR #50')
-      );
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('❌ Error handling pull request:'),
-        'Comment API Error',
-        expect.any(Error)
+        expect.stringContaining('❌ [PR COMMENT] Failed to post')
       );
     });
 
