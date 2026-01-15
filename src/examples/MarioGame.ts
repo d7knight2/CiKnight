@@ -93,6 +93,14 @@ export class MarioGame {
   private gameState: GameState;
   private enemies: Enemy[];
   private levelComplete: boolean;
+  private readonly initialConfig: GameConfig;
+
+  // Enemy configuration lookup for maintainability
+  private static readonly ENEMY_CONFIG: Record<string, number> = {
+    Goomba: 100,
+    Koopa: 200,
+    'Piranha Plant': 300,
+  };
 
   /**
    * Creates a new MarioGame instance
@@ -125,6 +133,20 @@ export class MarioGame {
     if (startLevel < 1) {
       throw new Error('Start level must be at least 1');
     }
+
+    // Store initial config for reset
+    this.initialConfig = {
+      playerName: config.playerName,
+      lives,
+      startLevel,
+    };
+
+    // Store initial config for reset
+    this.initialConfig = {
+      playerName: config.playerName,
+      lives,
+      startLevel,
+    };
 
     this.player = {
       name: config.playerName,
@@ -186,13 +208,14 @@ export class MarioGame {
 
     // Add enemies based on level difficulty
     const enemyCount = levelNumber + 2;
+    const enemyTypes = Object.keys(MarioGame.ENEMY_CONFIG);
+
     for (let i = 0; i < enemyCount; i++) {
-      const enemyTypes = ['Goomba', 'Koopa', 'Piranha Plant'];
       const type = enemyTypes[i % enemyTypes.length];
       this.enemies.push({
         type,
         defeated: false,
-        points: type === 'Goomba' ? 100 : type === 'Koopa' ? 200 : 300,
+        points: MarioGame.ENEMY_CONFIG[type],
       });
     }
   }
@@ -624,17 +647,17 @@ export class MarioGame {
    *
    * @example
    * ```typescript
-   * game.reset(); // Start fresh
+   * game.reset(); // Start fresh with original configuration
    * ```
    */
   public reset(): void {
     this.score = 0;
     this.coins = 0;
-    this.currentLevel = 1;
+    this.currentLevel = this.initialConfig.startLevel ?? 1;
     this.gameState = 'idle';
     this.enemies = [];
     this.levelComplete = false;
-    this.player.lives = 3;
+    this.player.lives = this.initialConfig.lives ?? 3;
     this.player.state = 'small';
     this.player.position = 0;
     this.player.verticalPosition = 0;

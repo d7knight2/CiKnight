@@ -523,6 +523,19 @@ describe('MarioGame', () => {
       expect(() => game.startLevel(1)).not.toThrow();
       expect(game.getGameState()).toBe('playing');
     });
+
+    it('should reset to initial configuration values', () => {
+      const game = new MarioGame({ playerName: 'Mario', lives: 5, startLevel: 2 });
+      game.startLevel(2);
+      game.collectCoin();
+
+      game.reset();
+
+      expect(game.getLives()).toBe(5);
+      expect(game.getCurrentLevel()).toBe(2);
+      expect(game.getScore()).toBe(0);
+      expect(game.getCoins()).toBe(0);
+    });
   });
 
   describe('Getters and State Queries', () => {
