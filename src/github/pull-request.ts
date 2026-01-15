@@ -9,8 +9,9 @@ export async function handlePullRequest(payload: any, action: string) {
 
     console.log(`🔍 Processing PR #${prNumber} in ${owner}/${repo} (action: ${action})`);
 
-    // Post a test comment to validate webhook operability
-    if (action === 'opened') {
+    // Post a test comment to validate webhook operability (if enabled)
+    const enableTestComments = process.env.ENABLE_WEBHOOK_TEST_COMMENTS === 'true';
+    if (action === 'opened' && enableTestComments) {
       const timestamp = new Date().toISOString();
       const testComment = `🤖 **CiKnight Webhook Test**\n\n✅ Webhook received and processed successfully!\n\n**Details:**\n- Event: \`pull_request.${action}\`\n- Timestamp: ${timestamp}\n- PR: #${prNumber}\n- Repository: ${owner}/${repo}`;
 
@@ -23,8 +24,6 @@ export async function handlePullRequest(payload: any, action: string) {
         'webhook test comment'
       );
     }
-
-    console.log(`🔍 Processing PR #${prNumber} in ${owner}/${repo} (action: ${action})`);
 
     // Check if PR is mergeable
     console.log(`🔍 Fetching PR details for #${prNumber}`);

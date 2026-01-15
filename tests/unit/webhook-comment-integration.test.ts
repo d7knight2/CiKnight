@@ -11,6 +11,7 @@ process.env.GITHUB_WEBHOOK_SECRET = 'test-webhook-secret';
 process.env.GITHUB_APP_ID = '123456';
 process.env.GITHUB_PRIVATE_KEY =
   '-----BEGIN RSA PRIVATE KEY-----\nMIIBogIBAAJBALRiMLAA\n-----END RSA PRIVATE KEY-----';
+process.env.ENABLE_WEBHOOK_TEST_COMMENTS = 'true'; // Enable test comments for tests
 
 // Mock octokit before importing webhook handler
 const mockCreateComment = jest.fn().mockResolvedValue({ data: { id: 1 } });
