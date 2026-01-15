@@ -58,8 +58,33 @@ app.get('/health', (_req, res) => {
 // GitHub webhook endpoint with rate limiting and IP restriction
 app.post('/webhook', webhookLimiter, ipRestrictionMiddleware, webhookHandler);
 
-// Start the server
-app.listen(PORT, () => {
+// Track active resources for cleanup
+const activeResources = new Set<string>();
+
+// Add a resource to track
+export function trackResource(resourceId: string): void {
+  activeResources.add(resourceId);
+  console.log(`📌 Resource tracked: ${resourceId}`);
+}
+
+// Remove a tracked resource
+export function untrackResource(resourceId: string): void {
+  activeResources.delete(resourceId);
+  console.log(`✅ Resource cleaned: ${resourceId}`);
+}
+
+// Cleanup all tracked resources
+async function cleanupResources(): Promise<void> {
+  if (activeResources.size > 0) {
+    console.log(`🧹 Cleaning up ${activeResources.size} active resources...`);
+    // In a real scenario, this would cleanup database connections, file handles, etc.
+    activeResources.clear();
+    console.log('✅ All resources cleaned up');
+  }
+}
+
+// Start the server and capture reference
+const server = app.listen(PORT, () => {
   console.log(`🚀 CiKnight is running on port ${PORT}`);
   console.log(`📡 Webhook endpoint: http://localhost:${PORT}/webhook`);
   console.log(`💚 Health check endpoint: http://localhost:${PORT}/health`);
@@ -67,10 +92,41 @@ app.listen(PORT, () => {
   console.log(`🔒 IP Restriction: DISABLED (all IPs accepted)`);
 });
 
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('SIGTERM signal received: closing HTTP server');
-  process.exit(0);
-});
+// Graceful shutdown handler
+async function gracefulShutdown(signal: string): Promise<void> {
+  console.log(`📡 ${signal} signal received: initiating graceful shutdown`);
 
+  // Stop accepting new connections
+  server.close(async (err) => {
+    if (err) {
+      console.error('❌ Error closing server:', err);
+      process.exit(1);
+    }
+
+    console.log('✅ Server closed - no longer accepting new connections');
+
+    // Cleanup resources
+    try {
+      await cleanupResources();
+      console.log('✅ Graceful shutdown completed');
+      process.exit(0);
+    } catch (error) {
+      console.error('❌ Error during cleanup:', error);
+      process.exit(1);
+    }
+  });
+
+  // Force shutdown after timeout
+  setTimeout(() => {
+    console.error('⚠️  Forceful shutdown after timeout');
+    process.exit(1);
+  }, 10000); // 10 second timeout
+}
+
+// Register signal handlers
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// Export server for testing
+export { server };
 export default app;
