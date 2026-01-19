@@ -550,6 +550,90 @@ The test suite includes:
    curl -s https://api.github.com/meta | jq '.hooks'
    ```
 
+### Webhook Signature Verification Issues
+
+**Problem:** Webhooks are being rejected with error: `[@octokit/webhooks] signature does not match event payload and secret`
+
+**Common Causes:**
+
+1. **Webhook secret mismatch**
+   - The secret configured in GitHub doesn't match `GITHUB_WEBHOOK_SECRET` in your environment
+   - Check for trailing spaces or newlines in the secret
+   
+   **Solution:** 
+   - Verify the secret in GitHub App settings matches exactly
+   - Use quotes when setting the environment variable to preserve exact value
+   - Check for hidden characters or encoding issues
+
+2. **Payload transformation**
+   - The payload is being modified before signature verification
+   - Middleware is altering the request body
+   
+   **Solution:**
+   - Ensure Express middleware captures raw body correctly
+   - The application uses `express.json()` with a `verify` callback to capture raw body
+
+3. **Encoding issues**
+   - Character encoding mismatch between GitHub and the application
+   
+   **Solution:**
+   - Verify UTF-8 encoding is used consistently
+   - Check that no byte-order marks (BOM) or special characters are causing issues
+
+**Debug Logging:**
+
+When a webhook is received, the application logs detailed debug information to help diagnose signature issues:
+
+```
+🔍 [Webhook Debug] Delivery ID: <delivery-id>, Event: <event-type>
+🔍 [Webhook Debug] Payload length: <bytes> bytes
+🔍 [Webhook Debug] Received signature: sha256=<signature>
+🔍 [Webhook Debug] Webhook secret configured: Yes / No
+🔍 [Webhook Debug] Signatures match: ✅ Yes / ❌ No
+```
+
+If signatures don't match in **non-production environments**, the computed signature is also logged for comparison:
+```
+🔍 [Webhook Debug] Computed signature: sha256=<computed-signature>
+🔍 [Webhook Debug] Note: Computed signature is only logged in non-production environments
+```
+
+> **Security Note**: The computed signature is only logged in development/staging (when `NODE_ENV !== 'production'`) to prevent potential information leakage in production logs.
+
+If signature verification fails, additional diagnostic information is logged:
+
+```
+🔍 [Webhook Debug] Signature verification failed!
+🔍 [Webhook Debug] Error details: <error-message>
+🔍 [Webhook Debug] Possible causes:
+  1. Webhook secret mismatch between GitHub and application
+  2. Payload was modified before signature verification
+  3. Encoding issues with the payload
+  4. Trailing spaces or newlines in the webhook secret
+```
+
+**Debugging Steps:**
+
+1. **Check the logs** for the debug output above
+2. **Compare signatures**: The received and computed signatures should match exactly
+3. **Verify secret**: Check that the secret length matches your expectations
+4. **Test locally**: Use tools like `ngrok` to forward webhooks to your local environment
+5. **Simulate webhooks**: Create test payloads with known secrets to verify the signature computation
+
+**Testing Signature Validation:**
+
+```bash
+# Test webhook signature computation manually
+node -e "
+const crypto = require('crypto');
+const secret = 'your-webhook-secret';
+const payload = '{\"test\":\"data\"}';
+const hmac = crypto.createHmac('sha256', secret);
+hmac.update(payload, 'utf8');
+console.log('sha256=' + hmac.digest('hex'));
+"
+```
+
 ### Other Common Issues
 
 **Problem:** Webhooks timeout or fail intermittently

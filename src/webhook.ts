@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { Webhooks } from '@octokit/webhooks';
 import { handlePullRequest } from './github/pull-request';
 import { handleCheckRun } from './github/check-run';
+import { computeWebhookSignature } from './utils/helpers';
 
 // Validate required environment variables
 const webhookSecret = process.env.GITHUB_WEBHOOK_SECRET;
@@ -111,6 +112,25 @@ export const webhookHandler = async (req: Request, res: Response): Promise<void>
     // Debug log: Payload summary (truncated for security)
     const payloadPreview = rawBody.length > 200 ? rawBody.substring(0, 200) + '...' : rawBody;
     console.log(`🔍 [WEBHOOK DEBUG] Payload preview (first 200 chars): ${payloadPreview}`);
+    // Debug logging for signature validation
+    console.log(`🔍 [Webhook Debug] Payload length: ${rawBody.length} bytes`);
+    console.log(`🔍 [Webhook Debug] Received signature: ${signature}`);
+    console.log(`🔍 [Webhook Debug] Webhook secret configured: ${webhookSecret ? 'Yes' : 'No'}`);
+
+    // Compute expected signature for debugging
+    if (webhookSecret) {
+      const computedSignature = computeWebhookSignature(webhookSecret, rawBody);
+      const signaturesMatch = signature === computedSignature;
+      console.log(`🔍 [Webhook Debug] Signatures match: ${signaturesMatch ? '✅ Yes' : '❌ No'}`);
+
+      // Only log computed signature in development/staging when there's a mismatch
+      if (!signaturesMatch && process.env.NODE_ENV !== 'production') {
+        console.log(`🔍 [Webhook Debug] Computed signature: ${computedSignature}`);
+        console.log(
+          '🔍 [Webhook Debug] Note: Computed signature is only logged in non-production environments'
+        );
+      }
+    }
 
     // Owner verification for pull_request events (before signature verification for efficiency)
     // Note: This check happens before signature verification to quickly reject unauthorized
@@ -166,6 +186,18 @@ export const webhookHandler = async (req: Request, res: Response): Promise<void>
     if (error.stack) {
       console.error('❌ [WEBHOOK DEBUG] Stack trace:', error.stack);
     }
+
+    // Additional debug logging for signature verification errors
+    if (error.message && error.message.includes('signature')) {
+      console.error('🔍 [Webhook Debug] Signature verification failed!');
+      console.error(`🔍 [Webhook Debug] Error details: ${error.message}`);
+      console.error('🔍 [Webhook Debug] Possible causes:');
+      console.error('  1. Webhook secret mismatch between GitHub and application');
+      console.error('  2. Payload was modified before signature verification');
+      console.error('  3. Encoding issues with the payload');
+      console.error('  4. Trailing spaces or newlines in the webhook secret');
+    }
+
     if (!responded) {
       res.status(500).json({ error: 'Internal server error', message: error.message });
     }
