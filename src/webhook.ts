@@ -87,14 +87,14 @@ export const webhookHandler = async (req: Request, res: Response): Promise<void>
     const event = req.headers['x-github-event'] as string;
     const id = req.headers['x-github-delivery'] as string;
 
-    console.log(`🔍 [Webhook Debug] Delivery ID: ${id}, Event: ${event}`);
+    // Debug log: Incoming webhook details
+    console.log(`🔍 [WEBHOOK DEBUG] Received webhook: event=${event}, delivery_id=${id}`);
+    console.log(
+      `🔍 [WEBHOOK DEBUG] Received signature: ${signature ? signature.substring(0, 15) + '...' : 'MISSING'}`
+    );
 
     if (!signature || !event || !id) {
-      console.error('❌ [Webhook Debug] Missing required headers:', {
-        hasSignature: !!signature,
-        hasEvent: !!event,
-        hasId: !!id,
-      });
+      console.error('❌ [WEBHOOK DEBUG] Missing required webhook headers');
       responded = true;
       res.status(400).json({ error: 'Missing required webhook headers' });
       return;
@@ -103,12 +103,15 @@ export const webhookHandler = async (req: Request, res: Response): Promise<void>
     // Use rawBody for signature verification, req.body is already parsed JSON
     const rawBody = (req as any).rawBody;
     if (!rawBody) {
-      console.error('❌ [Webhook Debug] Missing raw body for verification');
+      console.error('❌ [WEBHOOK DEBUG] Missing raw body for verification');
       responded = true;
       res.status(400).json({ error: 'Missing raw body for verification' });
       return;
     }
 
+    // Debug log: Payload summary (truncated for security)
+    const payloadPreview = rawBody.length > 200 ? rawBody.substring(0, 200) + '...' : rawBody;
+    console.log(`🔍 [WEBHOOK DEBUG] Payload preview (first 200 chars): ${payloadPreview}`);
     // Debug logging for signature validation
     console.log(`🔍 [Webhook Debug] Payload length: ${rawBody.length} bytes`);
     console.log(`🔍 [Webhook Debug] Received signature: ${signature}`);
@@ -164,6 +167,8 @@ export const webhookHandler = async (req: Request, res: Response): Promise<void>
       }
     }
 
+    // Verify webhook signature
+    console.log(`🔍 [WEBHOOK DEBUG] Verifying signature for event: ${event}`);
     await webhooks.verifyAndReceive({
       id,
       name: event as any, // GitHub sends various event names, type system can't enumerate all
@@ -171,11 +176,16 @@ export const webhookHandler = async (req: Request, res: Response): Promise<void>
       payload: rawBody,
     });
 
+    console.log(`✅ [WEBHOOK DEBUG] Signature verified successfully: ${event} (${id})`);
     console.log(`✅ Webhook verified and processed successfully: ${event} (${id})`);
     responded = true;
     res.status(200).json({ message: 'Webhook received' });
   } catch (error: any) {
     console.error('❌ Error processing webhook:', error);
+    // Log stack trace for debugging
+    if (error.stack) {
+      console.error('❌ [WEBHOOK DEBUG] Stack trace:', error.stack);
+    }
 
     // Additional debug logging for signature verification errors
     if (error.message && error.message.includes('signature')) {
